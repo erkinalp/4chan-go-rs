@@ -29,22 +29,22 @@ If you don't have Make installed, follow these steps:
 
 1. Build the Docker images:
 ```bash
-docker-compose build
+docker compose build
 ```
 
 2. Start all services:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 3. Run database migrations:
 ```bash
-docker-compose exec api npm run prisma:migrate
+docker compose exec api npm run prisma:migrate
 ```
 
 4. Seed the database with sample data:
 ```bash
-docker-compose exec api npm run seed
+docker compose exec api npm run seed
 ```
 
 ## Accessing the Application
@@ -82,47 +82,47 @@ The application consists of the following services:
 
 ```bash
 # View logs from all services
-docker-compose logs -f
+docker compose logs -f
 
 # View logs from a specific service
-docker-compose logs -f shell
+docker compose logs -f shell
 ```
 
 ### Accessing Service Shells
 
 ```bash
 # Access API shell
-docker-compose exec api sh
+docker compose exec api sh
 
 # Access frontend shell
-docker-compose exec shell sh
+docker compose exec shell sh
 ```
 
 ### Restarting Services
 
 ```bash
 # Restart all services
-docker-compose restart
+docker compose restart
 
 # Restart a specific service
-docker-compose restart shell
+docker compose restart shell
 ```
 
 ### Stopping the Application
 
 ```bash
 # Stop all services
-docker-compose down
+docker compose down
 
 # Stop and remove volumes (will delete database data)
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Troubleshooting
 
-1. **Service fails to start**: Check logs with `docker-compose logs [service_name]`
-2. **Database connection issues**: Ensure PostgreSQL container is running with `docker-compose ps`
-3. **Frontend not updating**: Try restarting the service with `docker-compose restart shell`
+1. **Service fails to start**: Check logs with `docker compose logs [service_name]`
+2. **Database connection issues**: Ensure PostgreSQL container is running with `docker compose ps`
+3. **Frontend not updating**: Try restarting the service with `docker compose restart shell`
 
 If you encounter any issues, please refer to the service-specific logs for more information.
 
