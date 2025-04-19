@@ -1,88 +1,88 @@
 # Media Processor
 
-Servicio avanzado para procesamiento de archivos multimedia implementado en Rust, especializado en análisis forense de imágenes, detección de contenido prohibido y procesamiento de alta performance.
+Advanced service for multimedia file processing implemented in Rust, specialized in forensic image analysis, prohibited content detection, and high-performance processing.
 
-## Características
+## Features
 
-- Análisis forense de imágenes y archivos multimedia
-- Detección avanzada de contenido prohibido mediante ML
-- Extracción de metadatos y verificación de integridad
-- Procesamiento concurrente de alta performance
-- Interfaz gRPC para comunicación eficiente entre servicios
-- Endpoints REST para integración con otros sistemas
+- Forensic analysis of images and multimedia files
+- Advanced detection of prohibited content using ML
+- Metadata extraction and integrity verification
+- High-performance concurrent processing
+- gRPC interface for efficient communication between services
+- REST endpoints for integration with other systems
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 media-processor/
 ├── src/
-│   ├── main.rs             # Punto de entrada
-│   ├── config.rs           # Configuración del servicio
-│   ├── error.rs            # Manejo centralizado de errores
-│   ├── handlers/           # Manejadores de peticiones
-│   │   ├── mod.rs          # Módulo handlers
-│   │   └── files.rs        # Manejador de archivos
+│   ├── main.rs             # Entry point
+│   ├── config.rs           # Service configuration
+│   ├── error.rs            # Centralized error handling
+│   ├── handlers/           # Request handlers
+│   │   ├── mod.rs          # Handlers module
+│   │   └── files.rs        # File handler
 │   ├── middleware/         # Middleware
-│   │   └── mod.rs          # Módulo middleware
-│   ├── models/             # Modelos de datos
-│   │   ├── mod.rs          # Módulo models
-│   │   ├── file.rs         # Modelo de archivo
-│   │   └── user.rs         # Modelo de usuario
-│   ├── repositories/       # Acceso a datos
-│   │   ├── mod.rs          # Módulo repositories
-│   │   ├── postgres_repository.rs  # Repositorio PostgreSQL
-│   │   └── s3_repository.rs        # Repositorio S3
-│   └── routes/             # Definición de rutas
-│       ├── mod.rs          # Módulo routes
-│       └── files.rs        # Rutas para archivos
-└── Cargo.toml              # Dependencias y configuración
+│   │   └── mod.rs          # Middleware module
+│   ├── models/             # Data models
+│   │   ├── mod.rs          # Models module
+│   │   ├── file.rs         # File model
+│   │   └── user.rs         # User model
+│   ├── repositories/       # Data access
+│   │   ├── mod.rs          # Repositories module
+│   │   ├── postgres_repository.rs  # PostgreSQL repository
+│   │   └── s3_repository.rs        # S3 repository
+│   └── routes/             # Route definitions
+│       ├── mod.rs          # Routes module
+│       └── files.rs        # File routes
+└── Cargo.toml              # Dependencies and configuration
 ```
 
-## Tecnologías
+## Technologies
 
 - Rust 1.70+
-- Actix Web (framework web)
-- Tokio (runtime asíncrono)
-- PostgreSQL (metadatos)
-- S3/MinIO (almacenamiento)
-- Redis (caché)
+- Actix Web (web framework)
+- Tokio (asynchronous runtime)
+- PostgreSQL (metadata)
+- S3/MinIO (storage)
+- Redis (cache)
 - tonic (gRPC)
-- Tensorflow/ONNX Runtime (modelos ML)
+- Tensorflow/ONNX Runtime (ML models)
 
-## Desarrollo
+## Development
 
 ```bash
-# Configuración de entorno
+# Environment setup
 cp .env.example .env
 
-# Desarrollo
+# Development
 cargo run
 
 # Tests
 cargo test
 
-# Compilación optimizada
+# Optimized build
 cargo build --release
 ```
 
 ## API
 
-El servicio expone dos interfaces:
+The service exposes two interfaces:
 
 ### REST API
-- `POST /analyze` - Analizar un archivo
-- `GET /results/:id` - Obtener resultados de análisis
-- `GET /health` - Estado del servicio
+- `POST /analyze` - Analyze a file
+- `GET /results/:id` - Get analysis results
+- `GET /health` - Service status
 
 ### gRPC
-- `AnalyzeFile` - Análisis de archivo
-- `GetAnalysisResult` - Obtener resultados
-- `BatchAnalyze` - Análisis por lotes
+- `AnalyzeFile` - File analysis
+- `GetAnalysisResult` - Get results
+- `BatchAnalyze` - Batch analysis
 
-## Seguridad
+## Security
 
-- Validación robusta de entrada
-- Análisis exhaustivo contra exploits conocidos
-- Aislamiento de procesos para análisis de contenido potencialmente malicioso
-- Limitación de recursos y timeouts
-- Auditoría completa de operaciones
+- Robust input validation
+- Comprehensive analysis against known exploits
+- Process isolation for potentially malicious content analysis
+- Resource limitation and timeouts
+- Complete operation auditing

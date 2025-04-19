@@ -1,74 +1,74 @@
 # File Service
 
-Servicio de gestión de archivos implementado en Go, especializado en validación segura, transformación y almacenamiento eficiente de archivos.
+File management service implemented in Go, specialized in secure validation, transformation, and efficient storage of files.
 
-## Características
+## Features
 
-- Validación exhaustiva de archivos para detectar contenido malicioso
-- Transformación y optimización de imágenes (redimensionamiento, compresión)
-- Generación de thumbnails y previsualizaciones
-- Almacenamiento eficiente en S3/MinIO 
-- Integración con el servicio media-processor para análisis avanzado
-- Alta performance y baja latencia
+- Comprehensive file validation to detect malicious content
+- Image transformation and optimization (resizing, compression)
+- Thumbnail and preview generation
+- Efficient storage in S3/MinIO 
+- Integration with the media-processor service for advanced analysis
+- High performance and low latency
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 file-service/
 ├── config/
-│   └── config.go        # Configuración del servicio
+│   └── config.go        # Service configuration
 ├── internal/
-│   ├── api/             # API HTTP
-│   │   ├── handlers/    # Manejadores de peticiones
-│   │   ├── models/      # Modelos de datos para la API
-│   │   └── router.go    # Definición de rutas
-│   ├── database/        # Conexiones a bases de datos
-│   │   ├── postgres.go  # Cliente PostgreSQL
-│   │   └── redis.go     # Cliente Redis
-│   ├── models/          # Modelos de dominio
-│   ├── storage/         # Almacenamiento de archivos
-│   │   └── minio.go     # Cliente S3/MinIO
-│   └── utils/           # Utilidades
-├── main.go              # Punto de entrada
-└── go.mod               # Dependencias
+│   ├── api/             # HTTP API
+│   │   ├── handlers/    # Request handlers
+│   │   ├── models/      # Data models for the API
+│   │   └── router.go    # Route definitions
+│   ├── database/        # Database connections
+│   │   ├── postgres.go  # PostgreSQL client
+│   │   └── redis.go     # Redis client
+│   ├── models/          # Domain models
+│   ├── storage/         # File storage
+│   │   └── minio.go     # S3/MinIO client
+│   └── utils/           # Utilities
+├── main.go              # Entry point
+└── go.mod               # Dependencies
 ```
 
-## Tecnologías
+## Technologies
 
 - Go 1.20+
-- PostgreSQL (metadatos de archivos)
-- Redis (caché)
-- S3/MinIO (almacenamiento de archivos)
-- Fiber (framework web)
+- PostgreSQL (file metadata)
+- Redis (cache)
+- S3/MinIO (file storage)
+- Fiber (web framework)
 - GORM (ORM)
 
-## Desarrollo
+## Development
 
 ```bash
-# Configuración de entorno
+# Environment setup
 cp .env.example .env
 
-# Iniciar servicio en modo desarrollo
+# Start service in development mode
 go run main.go
 
-# Ejecutar tests
+# Run tests
 go test ./...
 
-# Compilar para producción
+# Build for production
 go build -o file-service
 ```
 
 ## API
 
-El servicio expone una API REST con los siguientes endpoints principales:
+The service exposes a REST API with the following main endpoints:
 
-- `POST /files` - Subir un archivo nuevo
-- `GET /files/:id` - Obtener un archivo por ID
-- `GET /files/:id/thumbnail` - Obtener thumbnail de un archivo
-- `DELETE /files/:id` - Eliminar un archivo
+- `POST /files` - Upload a new file
+- `GET /files/:id` - Get a file by ID
+- `GET /files/:id/thumbnail` - Get thumbnail of a file
+- `DELETE /files/:id` - Delete a file
 
-## Integración con Servicios
+## Service Integration
 
-- Se comunica con `media-processor` para análisis avanzado de contenido
-- Expone métricas para monitoreo en Prometheus
-- Utiliza tracing distribuido con OpenTelemetry
+- Communicates with `media-processor` for advanced content analysis
+- Exposes metrics for monitoring in Prometheus
+- Uses distributed tracing with OpenTelemetry
