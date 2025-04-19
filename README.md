@@ -3,34 +3,34 @@
 
 This is the original source code powering 4chan, an anonymous imageboard launched in 2003. The codebase was designed to be lightweight, fast, and easy to deploy on minimal hosting resources. It draws heavy inspiration from Japanese imageboards such as Futaba Channel (2chan), and was initially written in PHP with a MySQL backend.
 
-Debemos aprender a **desaprender**: no es una contradicción, sino un acto de reparación interna. En un mundo que avanza tan rápido como el nuestro, muchas enseñanzas se vuelven obsoletas y nos limitan. Solo al soltar lo aprendido podemos abrirnos al crecimiento auténtico.
+We must learn to **unlearn**: it's not a contradiction, but an act of internal repair. In a world that advances as quickly as ours, many teachings become obsolete and limit us. Only by letting go of what we've learned can we open ourselves to authentic growth.
 
-Hace falta **ideas nuevas** que nazcan de nuestro sentir profundo. Cuando las costumbres se han vuelto códigos rígidos y las rutinas parecen guiones escritos de antemano, solo la creatividad genuina puede liberarnos del encierro de la repetición.
+We need **new ideas** that are born from our deep feelings. When customs have become rigid codes and routines seem like pre-written scripts, only genuine creativity can free us from the confinement of repetition.
 
-No fui un usuario activo de 4chan, pero reconozco que la libertad de expresión—y los espacios que la fomentan—son esenciales. Cada mente alberga una chispa de sabiduría: no inauguré este foro para cargar con la responsabilidad de lo que allí ocurra, sino para ofrecer un lugar donde cada cabeza encuentre su propia respuesta.
+I wasn't an active 4chan user, but I recognize that freedom of expression—and the spaces that foster it—are essential. Each mind harbors a spark of wisdom: I didn't inaugurate this forum to bear the responsibility of what happens there, but to offer a place where each person can find their own answer.
 
 —Verso Terso
 
-## Proyecto de Modernización
+## Modernization Project
 
-El directorio `v2/` contiene la modernización completa con arquitectura de microservicios y micro-frontends.
+The `v2/` directory contains the complete modernization with microservices architecture and micro-frontends.
 
-### Carpetas Principales en v2/
+### Main Folders in v2/
 
-- **api-specs**: Especificaciones OpenAPI
-- **api-core**: Núcleo de la API (TypeScript/NestJS)
-- **file-service**: Servicio de gestión de archivos (Go)
-- **media-processor**: Procesador de medios (Rust)
-- **frontend-legacy**: Frontend React tradicional
-- **frontend-modern**: Frontend React avanzado
-- **microfrontends**: Implementación de micro-frontends
-- **docs**: Documentación técnica
-- **infrastructure**: Configuración de infraestructura
+- **api-specs**: OpenAPI specifications
+- **api-core**: API Core (TypeScript/NestJS)
+- **file-service**: File management service (Go)
+- **media-processor**: Media processor (Rust)
+- **frontend-legacy**: Traditional React frontend
+- **frontend-modern**: Advanced React frontend
+- **microfrontends**: Micro-frontends implementation
+- **docs**: Technical documentation
+- **infrastructure**: Infrastructure configuration
 
-## Seguridad
+## Security
 
-**IMPORTANTE**: Antes de iniciar el desarrollo:
+**IMPORTANT**: Before starting development:
 
-1. **Nunca** uses los valores predeterminados en archivos `.env.example` en producción
-2. **Siempre** cambia todas las contraseñas, secretos y claves de API
-3. Todos los valores sensibles están marcados con `[REDACTED]` y deben ser reemplazados
+1. **Never** use default values in `.env.example` files in production
+2. **Always** change all passwords, secrets, and API keys
+3. All sensitive values are marked with `[REDACTED]` and must be replaced

@@ -1,84 +1,84 @@
-# Política de Seguridad
+# Security Policy
 
-## Reporte de Vulnerabilidades
+## Vulnerability Reporting
 
-La seguridad es una prioridad en este proyecto. Agradecemos enormemente los esfuerzos realizados por la comunidad de seguridad para mejorar la integridad de nuestro sistema.
+Security is a priority in this project. We greatly appreciate the efforts made by the security community to improve the integrity of our system.
 
-### Cómo Reportar una Vulnerabilidad
+### How to Report a Vulnerability
 
-Si descubres una vulnerabilidad de seguridad en el proyecto, por favor:
+If you discover a security vulnerability in the project, please:
 
-1. **NO** divulgues públicamente la vulnerabilidad en GitHub Issues, foros o listas de correo.
-2. Envía un correo electrónico a nuestro equipo de seguridad en [security@example.org] con detalles de la vulnerabilidad.
-3. Incluye los siguientes elementos en tu reporte:
-   - Descripción de la vulnerabilidad y su impacto potencial
-   - Pasos detallados para reproducir el problema
-   - Versiones afectadas
-   - Posibles mitigaciones o soluciones si las conoces
+1. Do **NOT** publicly disclose the vulnerability in GitHub Issues, forums, or mailing lists.
+2. Send an email to our security team at [security@example.org] with details of the vulnerability.
+3. Include the following elements in your report:
+   - Description of the vulnerability and its potential impact
+   - Detailed steps to reproduce the problem
+   - Affected versions
+   - Possible mitigations or solutions if you know them
 
-### Qué Esperar Después de Reportar
+### What to Expect After Reporting
 
-Nos comprometemos a:
+We commit to:
 
-1. Confirmar la recepción de tu reporte dentro de 48 horas
-2. Proporcionar una evaluación inicial del reporte dentro de 7 días
-3. Mantener comunicación contigo sobre el progreso hacia la resolución
-4. Reconocer tu contribución cuando la vulnerabilidad sea resuelta (si así lo deseas)
+1. Confirm receipt of your report within 48 hours
+2. Provide an initial assessment of the report within 7 days
+3. Maintain communication with you about progress toward resolution
+4. Acknowledge your contribution when the vulnerability is resolved (if you wish)
 
-## Política de Divulgación
+## Disclosure Policy
 
-Seguimos un modelo de divulgación coordinada:
+We follow a coordinated disclosure model:
 
-1. El problema será abordado tan pronto como sea posible
-2. Una vez desarrollada una solución, coordinaremos una fecha de publicación con el descubridor
-3. Publicaremos un aviso de seguridad detallando la vulnerabilidad, su impacto y cómo los usuarios pueden protegerse
+1. The issue will be addressed as soon as possible
+2. Once a solution is developed, we will coordinate a publication date with the discoverer
+3. We will publish a security advisory detailing the vulnerability, its impact, and how users can protect themselves
 
-## Recompensas por Bugs (Bug Bounty)
+## Bug Bounty
 
-Actualmente no ofrecemos un programa formal de recompensas por bugs, pero reconoceremos públicamente a quienes reporten vulnerabilidades significativas (con su permiso).
+We currently do not offer a formal bug bounty program, but we will publicly acknowledge those who report significant vulnerabilities (with their permission).
 
-## Alcance
+## Scope
 
-Esta política de seguridad aplica a todos los componentes del proyecto de modernización de 4chan, incluyendo:
+This security policy applies to all components of the 4chan modernization project, including:
 
-- Código fuente del backend
-- Código fuente del frontend
-- Infraestructura como código
-- Sistemas de CI/CD
-- Configuraciones de despliegue
+- Backend source code
+- Frontend source code
+- Infrastructure as code
+- CI/CD systems
+- Deployment configurations
 
-## Prácticas de Seguridad
+## Security Practices
 
-Este proyecto implementa las siguientes prácticas para mantener la seguridad:
+This project implements the following practices to maintain security:
 
-- Análisis automático de dependencias para vulnerabilidades
-- Revisión manual de código para cambios sensibles
-- Pruebas de seguridad integradas en el pipeline de CI/CD
-- Escaneo regular de seguridad en infraestructura de producción
-- Auditorías de seguridad periódicas
+- Automated dependency analysis for vulnerabilities
+- Manual code review for sensitive changes
+- Security testing integrated into the CI/CD pipeline
+- Regular security scanning in production infrastructure
+- Periodic security audits
 
-## Respuesta a Incidentes
+## Incident Response
 
-En caso de un incidente de seguridad confirmado:
+In case of a confirmed security incident:
 
-1. Formaremos un equipo de respuesta a incidentes
-2. Investigaremos el alcance y el impacto
-3. Desarrollaremos e implementaremos mitigaciones
-4. Comunicaremos a los usuarios afectados según sea necesario
-5. Publicaremos un análisis post-incidente y medidas preventivas futuras
+1. We will form an incident response team
+2. Investigate the scope and impact
+3. Develop and implement mitigations
+4. Communicate to affected users as necessary
+5. Publish a post-incident analysis and future preventive measures
 
-## Historial de Avisos de Seguridad
+## Security Advisory History
 
-| Fecha | Vulnerabilidad | Versiones Afectadas | Versiones Corregidas |
-|-------|----------------|---------------------|----------------------|
-| N/A   | N/A            | N/A                 | N/A                  |
+| Date | Vulnerability | Affected Versions | Fixed Versions |
+|------|--------------|-------------------|----------------|
+| N/A  | N/A          | N/A               | N/A            |
 
-## Recursos de Seguridad
+## Security Resources
 
 - [OWASP Top Ten](https://owasp.org/www-project-top-ten/)
 - [OWASP API Security Top 10](https://owasp.org/www-project-api-security/)
-- [Guía de Desarrollo Seguro](docs/security/secure_development.md)
+- [Secure Development Guide](docs/security/secure_development.md)
 
 ---
 
-Última actualización: 17 de abril de 2025
+Last updated: April 17, 2025

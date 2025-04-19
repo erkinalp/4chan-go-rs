@@ -1,137 +1,137 @@
-# Guía de Contribución
+# Contribution Guide
 
-¡Gracias por tu interés en contribuir al proyecto de modernización de 4chan! Este documento proporciona lineamientos para contribuir efectivamente al proyecto.
+Thank you for your interest in contributing to the 4chan modernization project! This document provides guidelines for effectively contributing to the project.
 
-## Tabla de Contenidos
+## Table of Contents
 
-- [Código de Conducta](#código-de-conducta)
-- [Cómo Contribuir](#cómo-contribuir)
-  - [Reportando Bugs](#reportando-bugs)
-  - [Solicitando Características](#solicitando-características)
+- [Code of Conduct](#code-of-conduct)
+- [How to Contribute](#how-to-contribute)
+  - [Reporting Bugs](#reporting-bugs)
+  - [Requesting Features](#requesting-features)
   - [Pull Requests](#pull-requests)
-- [Estándares de Código](#estándares-de-código)
+- [Code Standards](#code-standards)
   - [JavaScript/TypeScript](#javascripttypescript)
   - [CSS/SCSS](#cssscss)
-  - [Pruebas](#pruebas)
-- [Proceso de Desarrollo](#proceso-de-desarrollo)
+  - [Tests](#tests)
+- [Development Process](#development-process)
   - [Branching Strategy](#branching-strategy)
   - [Commit Messages](#commit-messages)
-  - [Revisión de Código](#revisión-de-código)
-- [Configuración del Entorno de Desarrollo](#configuración-del-entorno-de-desarrollo)
-- [Recursos Adicionales](#recursos-adicionales)
+  - [Code Review](#code-review)
+- [Development Environment Setup](#development-environment-setup)
+- [Additional Resources](#additional-resources)
 
-## Código de Conducta
+## Code of Conduct
 
-Este proyecto y todos sus participantes están gobernados por nuestro [Código de Conducta](CODE_OF_CONDUCT.md). Al participar, se espera que cumplas con este código. Por favor, reporta comportamientos inaceptables a [conduct@example.org].
+This project and all its participants are governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to comply with this code. Please report unacceptable behavior to [conduct@example.org].
 
-## Cómo Contribuir
+## How to Contribute
 
-### Reportando Bugs
+### Reporting Bugs
 
-Los bugs se reportan a través de [GitHub Issues](https://github.com/username/4chan/issues). Antes de crear un nuevo reporte de bug, por favor verifica si ya existe uno similar.
+Bugs are reported through [GitHub Issues](https://github.com/username/4chan/issues). Before creating a new bug report, please verify if a similar one already exists.
 
-Cuando reportes un bug, incluye:
-- Un título claro y descriptivo
-- Pasos para reproducir el problema
-- Comportamiento esperado vs. comportamiento actual
-- Capturas de pantalla (si aplica)
-- Información del entorno (sistema operativo, navegador, versiones)
+When reporting a bug, include:
+- A clear and descriptive title
+- Steps to reproduce the problem
+- Expected behavior vs. actual behavior
+- Screenshots (if applicable)
+- Environment information (operating system, browser, versions)
 
-### Solicitando Características
+### Requesting Features
 
-Las solicitudes de características también se manejan a través de GitHub Issues. Proporciona:
-- Descripción clara del problema que la característica resolvería
-- Explicación de cómo ayudaría a los usuarios
-- Cualquier referencia o ejemplo de implementaciones similares
+Feature requests are also handled through GitHub Issues. Provide:
+- Clear description of the problem the feature would solve
+- Explanation of how it would help users
+- Any references or examples of similar implementations
 
 ### Pull Requests
 
-1. Bifurca (fork) el repositorio y crea tu rama desde `main`
-2. Si añades código, añade pruebas que cubran tu código
-3. Si cambias APIs, actualiza la documentación
-4. Asegúrate de que las pruebas pasen
-5. Asegúrate de que tu código cumpla con nuestros estándares
-6. Envía tu Pull Request!
+1. Fork the repository and create your branch from `main`
+2. If you add code, add tests that cover your code
+3. If you change APIs, update the documentation
+4. Ensure tests pass
+5. Ensure your code meets our standards
+6. Submit your Pull Request!
 
-## Estándares de Código
+## Code Standards
 
 ### JavaScript/TypeScript
 
-- Seguimos el estándar de estilo [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascript)
-- Utilizamos TypeScript para todo el nuevo código
-- Se requiere documentación JSDoc para todas las funciones públicas
+- We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascript)
+- We use TypeScript for all new code
+- JSDoc documentation is required for all public functions
 
 ### CSS/SCSS
 
-- Usamos BEM (Block Element Modifier) para nomenclatura de clases
-- Preferimos SCSS sobre CSS plano
-- Mantenemos la especificidad al mínimo
+- We use BEM (Block Element Modifier) for class naming
+- We prefer SCSS over plain CSS
+- We keep specificity to a minimum
 
-### Pruebas
+### Tests
 
-- Se requiere cobertura de pruebas para todo el código nuevo (objetivo: >80%)
-- Usamos Jest para pruebas unitarias
-- Cypress para pruebas end-to-end
-- Las pruebas deben ser legibles y mantenibles
+- Test coverage is required for all new code (target: >80%)
+- We use Jest for unit tests
+- Cypress for end-to-end tests
+- Tests should be readable and maintainable
 
-## Proceso de Desarrollo
+## Development Process
 
 ### Branching Strategy
 
-Seguimos un modelo basado en GitFlow:
-- `main`: Código en producción
-- `develop`: Rama principal de desarrollo
-- `feature/*`: Para nuevas características
-- `bugfix/*`: Para correcciones de bugs
-- `release/*`: Para preparación de lanzamientos
-- `hotfix/*`: Para arreglos urgentes en producción
+We follow a GitFlow-based model:
+- `main`: Production code
+- `develop`: Main development branch
+- `feature/*`: For new features
+- `bugfix/*`: For bug fixes
+- `release/*`: For release preparation
+- `hotfix/*`: For urgent fixes in production
 
 ### Commit Messages
 
-Seguimos el formato de [Conventional Commits](https://www.conventionalcommits.org/):
+We follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```
-<tipo>[alcance opcional]: <descripción>
+<type>[optional scope]: <description>
 
-[cuerpo opcional]
+[optional body]
 
-[pie opcional]
+[optional footer]
 ```
 
-Tipos principales:
-- `feat`: Nueva característica
-- `fix`: Corrección de bug
-- `docs`: Cambios en documentación
-- `style`: Cambios que no afectan el significado del código
-- `refactor`: Cambio de código que no arregla un bug ni añade una característica
-- `test`: Adición o corrección de pruebas
-- `chore`: Cambios en el proceso de build o herramientas auxiliares
+Main types:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Changes that do not affect code meaning
+- `refactor`: Code change that neither fixes a bug nor adds a feature
+- `test`: Adding or fixing tests
+- `chore`: Changes to the build process or auxiliary tools
 
-### Revisión de Código
+### Code Review
 
-- Cada PR requiere al menos una aprobación
-- Los comentarios deben ser constructivos y claros
-- Se espera que los autores respondan a los comentarios de manera oportuna
+- Each PR requires at least one approval
+- Comments should be constructive and clear
+- Authors are expected to respond to comments in a timely manner
 
-## Configuración del Entorno de Desarrollo
+## Development Environment Setup
 
-1. Clona el repositorio
-2. Instala las dependencias con `npm install`
-3. Copia `.env.example` a `.env` y configura las variables
-4. Inicia el entorno de desarrollo con `npm run dev`
-5. Ejecuta las pruebas con `npm test`
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Copy `.env.example` to `.env` and configure the variables
+4. Start the development environment with `npm run dev`
+5. Run tests with `npm test`
 
-Para configurar la base de datos:
-1. Instala PostgreSQL y Redis
-2. Ejecuta las migraciones con `npm run db:migrate`
-3. (Opcional) Carga datos de prueba con `npm run db:seed`
+To set up the database:
+1. Install PostgreSQL and Redis
+2. Run migrations with `npm run db:migrate`
+3. (Optional) Load test data with `npm run db:seed`
 
-## Recursos Adicionales
+## Additional Resources
 
-- [Documentación de la API](docs/api.md)
-- [Guía de Arquitectura](docs/architecture.md)
-- [Plan de Migración](docs/migration.md)
+- [API Documentation](docs/api.md)
+- [Architecture Guide](docs/architecture.md)
+- [Migration Plan](docs/migration.md)
 
 ---
 
-¡Gracias por contribuir a la modernización de 4chan! Tus esfuerzos ayudan a preservar y mejorar una parte importante de la cultura de internet.
+Thank you for contributing to the 4chan modernization! Your efforts help preserve and improve an important part of internet culture.

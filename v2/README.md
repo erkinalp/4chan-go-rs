@@ -1,69 +1,69 @@
-# Proyecto de Modernización v2
+# Modernization Project v2
 
-Este directorio contiene la versión modernizada de la aplicación, implementando una arquitectura moderna basada en microservicios y micro-frontends.
+This directory contains the modernized version of the application, implementing a modern architecture based on microservices and micro-frontends.
 
-## Estructura del Proyecto
+## Project Structure
 
-- **api-core** - Núcleo central de la API implementado con TypeScript/NestJS
-  - API Gateway y orquestación de servicios
-  - Gestión de autenticación y autorización
-  - Implementación de lógica de negocio central
+- **api-core** - Central API core implemented with TypeScript/NestJS
+  - API Gateway and service orchestration
+  - Authentication and authorization management
+  - Implementation of core business logic
 
-- **file-service** - Servicio de gestión de archivos implementado en Go
-  - Validación segura de archivos
-  - Transformación y optimización de imágenes
-  - Almacenamiento eficiente en S3/MinIO
+- **file-service** - File management service implemented in Go
+  - Secure file validation
+  - Image transformation and optimization
+  - Efficient storage in S3/MinIO
 
-- **media-processor** - Procesador avanzado de medios implementado en Rust
-  - Análisis forense de imágenes
-  - Procesamiento de alta performance
-  - Detección de contenido prohibido
+- **media-processor** - Advanced media processor implemented in Rust
+  - Forensic image analysis
+  - High-performance processing
+  - Prohibited content detection
 
-- **frontend-legacy** - Implementación React tradicional del frontend
-  - Soporte para temas clásicos
-  - Interfaz responsiva
-  - Componentes React reutilizables
+- **frontend-legacy** - Traditional React implementation of the frontend
+  - Support for classic themes
+  - Responsive interface
+  - Reusable React components
 
-- **frontend-modern** - Implementación avanzada con arquitectura moderna
-  - Gestión de estado con Redux Toolkit
-  - Integración con Web Components
-  - Optimización avanzada de rendimiento
+- **frontend-modern** - Advanced implementation with modern architecture
+  - State management with Redux Toolkit
+  - Integration with Web Components
+  - Advanced performance optimization
 
-- **microfrontends** - Implementación completa de micro-frontends
-  - shell - Aplicación principal que orquesta los micro-frontends
-  - board-viewer - Visualización de tablones e hilos
-  - catalog-viewer - Vista de catálogo
-  - post-creator - Creación de posts
-  - auth - Gestión de autenticación
-  - media-viewer - Visualización de medios
-  - moderation - Herramientas de moderación
+- **microfrontends** - Complete implementation of micro-frontends
+  - shell - Main application that orchestrates the micro-frontends
+  - board-viewer - Board and thread visualization
+  - catalog-viewer - Catalog view
+  - post-creator - Post creation
+  - auth - Authentication management
+  - media-viewer - Media visualization
+  - moderation - Moderation tools
 
-- **api-specs** - Definiciones de API en formato OpenAPI/Swagger
-  - Documentación completa de endpoints
-  - Especificaciones para generación de clientes
+- **api-specs** - API definitions in OpenAPI/Swagger format
+  - Complete endpoint documentation
+  - Specifications for client generation
 
-- **docs** - Documentación técnica
-  - Arquitectura y diseño
-  - Modelos de seguridad
+- **docs** - Technical documentation
+  - Architecture and design
+  - Security models
 
-- **infrastructure** - Configuración de infraestructura
-  - Docker y Kubernetes
+- **infrastructure** - Infrastructure configuration
+  - Docker and Kubernetes
   - CI/CD
-  - Scripts de automatización
+  - Automation scripts
 
-## Tecnologías Principales
+## Main Technologies
 
 - Backend: TypeScript (NestJS), Go, Rust
 - Frontend: React, TypeScript, Web Components
-- Almacenamiento: PostgreSQL, Redis, S3/MinIO
-- Infraestructura: Docker, Kubernetes
+- Storage: PostgreSQL, Redis, S3/MinIO
+- Infrastructure: Docker, Kubernetes
 
-## Desarrollo
+## Development
 
-Cada componente tiene su propio README con instrucciones específicas para desarrollo, pruebas y despliegue.
+Each component has its own README with specific instructions for development, testing, and deployment.
 
 ```bash
-# Para ejecutar el stack completo en desarrollo
+# To run the complete stack in development
 cd infrastructure
 docker-compose up
 ```

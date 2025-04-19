@@ -1,243 +1,243 @@
 # MVP (Minimum Viable Product) - 4chan Modernization
 
-## Visión General
+## Overview
 
-El MVP del proyecto de modernización de 4chan tiene como objetivo desarrollar una versión funcional y moderna que mantenga las características esenciales de la plataforma original mientras actualiza su infraestructura tecnológica, seguridad y experiencia de usuario. Este documento detalla los componentes esenciales, funcionalidades y objetivos técnicos que conformarán la primera fase de la migración.
+The MVP of the 4chan modernization project aims to develop a functional and modern version that maintains the essential features of the original platform while updating its technological infrastructure, security, and user experience. This document details the essential components, functionalities, and technical objectives that will form the first phase of the migration.
 
-## Objetivos Principales
+## Main Objectives
 
-1. **Modernizar la infraestructura tecnológica** para mejorar seguridad, escalabilidad y mantenibilidad
-2. **Preservar la funcionalidad central** que define la experiencia del usuario
-3. **Implementar mejoras críticas de seguridad** identificadas en el análisis forense
-4. **Establecer una base arquitectónica sólida** para futuras iteraciones
-5. **Minimizar la disrupción** para usuarios actuales durante la transición
+1. **Modernize the technological infrastructure** to improve security, scalability, and maintainability
+2. **Preserve the core functionality** that defines the user experience
+3. **Implement critical security improvements** identified in the forensic analysis
+4. **Establish a solid architectural foundation** for future iterations
+5. **Minimize disruption** for current users during the transition
 
-## Componentes Técnicos del MVP
+## Technical Components of the MVP
 
-### 1. Arquitectura Base
+### 1. Base Architecture
 
 #### 1.1 Backend
-- **Lenguaje de Programación**: Node.js (v16+) con TypeScript
-- **Arquitectura**: Microservicios con API Gateway
-- **Framework**: NestJS para servicios principales
-- **Comunicación**: REST API con soporte GraphQL opcional
-- **Seguridad**: Implementación OAuth 2.0/JWT para autenticación
+- **Programming Language**: Node.js (v16+) with TypeScript
+- **Architecture**: Microservices with API Gateway
+- **Framework**: NestJS for main services
+- **Communication**: REST API with optional GraphQL support
+- **Security**: OAuth 2.0/JWT implementation for authentication
 
-#### 1.2 Base de Datos
-- **Sistema Principal**: PostgreSQL 14+ (reemplazando MySQL)
-- **Almacenamiento de Objetos**: MinIO compatible con S3
-- **Caché**: Redis para datos volátiles y sesiones
-- **Esquema**: Migración con compatibilidad hacia atrás
+#### 1.2 Database
+- **Main System**: PostgreSQL 14+ (replacing MySQL)
+- **Object Storage**: MinIO compatible with S3
+- **Cache**: Redis for volatile data and sessions
+- **Schema**: Migration with backward compatibility
 
 #### 1.3 Frontend
-- **Framework**: React 18+ con TypeScript
-- **Gestión de Estado**: Redux Toolkit
-- **Estilización**: CSS Modules y Styled Components
-- **Compatibilidad**: Soporte para navegadores modernos y móviles
-- **Accesibilidad**: Cumplimiento WCAG 2.1 AA
+- **Framework**: React 18+ with TypeScript
+- **State Management**: Redux Toolkit
+- **Styling**: CSS Modules and Styled Components
+- **Compatibility**: Support for modern browsers and mobile
+- **Accessibility**: WCAG 2.1 AA compliance
 
-#### 1.4 Infraestructura
-- **Contenedorización**: Docker para todos los servicios
-- **Orquestación**: Kubernetes para despliegue y gestión
-- **CI/CD**: Pipeline automatizado con GitHub Actions
-- **Monitorización**: Prometheus, Grafana y OpenTelemetry
+#### 1.4 Infrastructure
+- **Containerization**: Docker for all services
+- **Orchestration**: Kubernetes for deployment and management
+- **CI/CD**: Automated pipeline with GitHub Actions
+- **Monitoring**: Prometheus, Grafana, and OpenTelemetry
 - **Logs**: ELK Stack (Elasticsearch, Logstash, Kibana)
 
-### 2. Microservicios Esenciales
+### 2. Essential Microservices
 
 #### 2.1 API Gateway
-- Enrutamiento y balanceo de carga
-- Limitación de tasa y protección DoS
-- Validación de autenticación/autorización
-- Logs y métricas centralizadas
+- Routing and load balancing
+- Rate limiting and DoS protection
+- Authentication/authorization validation
+- Centralized logs and metrics
 
-#### 2.2 Servicio de Usuarios
-- Gestión de autenticación (pases)
-- Roles y permisos (anónimo, usuario registrado, moderador, admin)
-- Integración con sistemas de captcha
-- Datos de preferencias del usuario
+#### 2.2 User Service
+- Authentication management (passes)
+- Roles and permissions (anonymous, registered user, moderator, admin)
+- Integration with captcha systems
+- User preference data
 
-#### 2.3 Servicio de Contenido
-- Gestión de tablones (boards)
-- Manejo de hilos y respuestas
-- Motor de búsqueda y catalogación
-- Sistema de archivado automático
+#### 2.3 Content Service
+- Board management
+- Thread and reply handling
+- Search engine and cataloging
+- Automatic archiving system
 
-#### 2.4 Servicio de Archivos
-- Validación segura de archivos subidos
-- Procesamiento y transformación de imágenes
-- Detección de contenido malicioso
-- Integración con almacenamiento de objetos
+#### 2.4 File Service
+- Secure validation of uploaded files
+- Image processing and transformation
+- Malicious content detection
+- Integration with object storage
 
-#### 2.5 Servicio de Moderación
-- Sistema de reportes
-- Herramientas de moderación (ban, eliminación)
-- Auditoría de acciones de moderación
-- Filtrado de contenido automatizado
+#### 2.5 Moderation Service
+- Report system
+- Moderation tools (ban, deletion)
+- Moderation action auditing
+- Automated content filtering
 
-## Funcionalidades del MVP
+## MVP Functionalities
 
-### 1. Funcionalidades de Usuario
+### 1. User Functionalities
 
-#### 1.1 Navegación y Visualización
-- Navegación entre tablones
-- Visualización de hilos y respuestas
-- Vista de catálogo con miniaturas
-- Vista móvil adaptativa
-- Cambio entre temas visuales
+#### 1.1 Navigation and Viewing
+- Navigation between boards
+- Viewing threads and replies
+- Catalog view with thumbnails
+- Adaptive mobile view
+- Switching between visual themes
 
-#### 1.2 Interacción
-- Creación de hilos nuevos
-- Respuestas a hilos existentes
-- Subida de imágenes (formatos principales: JPG, PNG, GIF, WebM)
-- Sistema de citas y referencias
-- Filtrado básico de contenido
+#### 1.2 Interaction
+- Creation of new threads
+- Replies to existing threads
+- Image uploads (main formats: JPG, PNG, GIF, WebM)
+- Quote and reference system
+- Basic content filtering
 
-#### 1.3 Personalización
-- Temas visuales (Yotsuba, Futaba, etc.)
-- Preferencias de visualización persistentes
-- Ajustes de visualización de imágenes
-- Ocultar hilos o respuestas
+#### 1.3 Personalization
+- Visual themes (Yotsuba, Futaba, etc.)
+- Persistent display preferences
+- Image display settings
+- Hide threads or replies
 
-### 2. Funcionalidades de Moderación
+### 2. Moderation Functionalities
 
-#### 2.1 Gestión de Contenido
-- Eliminación de posts/hilos
-- Baneo temporal/permanente de IPs
-- Gestión de reportes de usuarios
-- Visualización de logs de moderación
-- Filtros de palabras configurables
+#### 2.1 Content Management
+- Post/thread deletion
+- Temporary/permanent IP banning
+- User report management
+- Moderation log viewing
+- Configurable word filters
 
-#### 2.2 Administración
-- Panel de administración seguro
-- Gestión de moderadores
-- Estadísticas de uso y actividad
-- Configuración de tablones
-- Anuncios globales/por tablón
+#### 2.2 Administration
+- Secure administration panel
+- Moderator management
+- Usage and activity statistics
+- Board configuration
+- Global/per-board announcements
 
-### 3. Seguridad y Rendimiento
+### 3. Security and Performance
 
-#### 3.1 Seguridad
-- Protección contra XSS, CSRF, SQLi
-- Validación de archivos para prevenir RCE
-- Sanitización de entrada de usuario
-- Autenticación 2FA para moderadores
-- Gestión segura de sesiones
+#### 3.1 Security
+- Protection against XSS, CSRF, SQLi
+- File validation to prevent RCE
+- User input sanitization
+- 2FA authentication for moderators
+- Secure session management
 
-#### 3.2 Rendimiento
-- Optimización para alta concurrencia
-- Estrategias de caché en múltiples niveles
-- Carga diferida de contenido
-- Optimización de imágenes automática
-- Escalado horizontal de servicios
+#### 3.2 Performance
+- Optimization for high concurrency
+- Multi-level cache strategies
+- Lazy loading of content
+- Automatic image optimization
+- Horizontal scaling of services
 
 ## API
 
-### Endpoints Principales
+### Main Endpoints
 
-#### Posts y Threads
-- `GET /api/boards/{board}/threads` - Listar hilos en un tablón
-- `GET /api/boards/{board}/threads/{threadId}` - Obtener hilo completo
-- `POST /api/boards/{board}/threads` - Crear nuevo hilo
-- `POST /api/boards/{board}/threads/{threadId}/replies` - Añadir respuesta
-- `DELETE /api/posts/{postId}` - Eliminar post (requiere auth)
+#### Posts and Threads
+- `GET /api/boards/{board}/threads` - List threads in a board
+- `GET /api/boards/{board}/threads/{threadId}` - Get complete thread
+- `POST /api/boards/{board}/threads` - Create new thread
+- `POST /api/boards/{board}/threads/{threadId}/replies` - Add reply
+- `DELETE /api/posts/{postId}` - Delete post (requires auth)
 
-#### Archivos
-- `POST /api/files/upload` - Subir archivo
-- `GET /api/files/{fileId}` - Obtener metadatos de archivo
-- `GET /api/thumbnails/{fileId}` - Obtener miniatura
+#### Files
+- `POST /api/files/upload` - Upload file
+- `GET /api/files/{fileId}` - Get file metadata
+- `GET /api/thumbnails/{fileId}` - Get thumbnail
 
-#### Moderación
-- `POST /api/moderation/reports` - Crear reporte
-- `GET /api/moderation/reports` - Listar reportes (requiere auth)
-- `POST /api/moderation/bans` - Crear ban (requiere auth)
-- `GET /api/moderation/bans` - Listar bans (requiere auth)
+#### Moderation
+- `POST /api/moderation/reports` - Create report
+- `GET /api/moderation/reports` - List reports (requires auth)
+- `POST /api/moderation/bans` - Create ban (requires auth)
+- `GET /api/moderation/bans` - List bans (requires auth)
 
-## Interfaz de Usuario
+## User Interface
 
-### Componentes Principales
+### Main Components
 
-#### Navegación
-- Cabecera con menú de navegación
-- Lista de tablones disponibles
-- Migas de pan (breadcrumbs)
-- Pie de página con enlaces y política
+#### Navigation
+- Header with navigation menu
+- List of available boards
+- Breadcrumbs
+- Footer with links and policy
 
-#### Visualización de Contenido
-- Vista de índice con hilos
-- Vista de hilo completo
-- Vista de catálogo
-- Visor de imágenes con zoom
+#### Content Display
+- Index view with threads
+- Complete thread view
+- Catalog view
+- Image viewer with zoom
 
-#### Formularios
-- Formulario de creación de hilo
-- Formulario de respuesta
-- Selector de archivos con vista previa
-- Interfaz de reporte
+#### Forms
+- Thread creation form
+- Reply form
+- File selector with preview
+- Report interface
 
-## Plan de Implementación
+## Implementation Plan
 
-### Fase 1: Fundamentos (4 semanas)
-- Configuración de infraestructura base
-- Implementación de CI/CD
-- Estructura de microservicios
-- Diseño de esquema de base de datos
+### Phase 1: Foundations (4 weeks)
+- Base infrastructure setup
+- CI/CD implementation
+- Microservices structure
+- Database schema design
 
-### Fase 2: Backend Core (6 semanas)
-- Desarrollo de API Gateway
-- Implementación de servicios esenciales
-- Mecanismos de autenticación/autorización
-- Validación y procesamiento de archivos
+### Phase 2: Backend Core (6 weeks)
+- API Gateway development
+- Essential services implementation
+- Authentication/authorization mechanisms
+- File validation and processing
 
-### Fase 3: Frontend (5 semanas)
-- Desarrollo de componentes UI
-- Implementación de temas visuales
-- Integración con API
-- Optimización para móviles
+### Phase 3: Frontend (5 weeks)
+- UI component development
+- Visual theme implementation
+- API integration
+- Mobile optimization
 
-### Fase 4: Integración y Pruebas (3 semanas)
-- Integración de todos los servicios
-- Pruebas de carga y rendimiento
-- Pruebas de seguridad
-- Resolución de bugs críticos
+### Phase 4: Integration and Testing (3 weeks)
+- Integration of all services
+- Load and performance testing
+- Security testing
+- Critical bug resolution
 
-### Fase 5: Migración y Lanzamiento (2 semanas)
-- Migración de datos iniciales
-- Implementación de fase dual (legacy/nuevo)
-- Monitorización reforzada
-- Lanzamiento gradual por tablones
+### Phase 5: Migration and Launch (2 weeks)
+- Initial data migration
+- Dual phase implementation (legacy/new)
+- Enhanced monitoring
+- Gradual launch by boards
 
-## Métricas de Éxito
+## Success Metrics
 
-### Técnicas
-- Tiempo de respuesta promedio < 200ms
-- Disponibilidad del servicio > 99.9%
-- Puntuación de seguridad (OWASP Top 10) > 90%
-- Cobertura de pruebas > 80%
+### Technical
+- Average response time < 200ms
+- Service availability > 99.9%
+- Security score (OWASP Top 10) > 90%
+- Test coverage > 80%
 
-### De Usuario
-- Retención de usuarios existentes > 90%
-- Reducción de reportes de errores > 70%
-- Satisfacción con la experiencia de usuario > 80%
-- Adopción de características nuevas > 50%
+### User
+- Existing user retention > 90%
+- Error report reduction > 70%
+- User experience satisfaction > 80%
+- New feature adoption > 50%
 
-## Consideraciones de Migración
+## Migration Considerations
 
-### Datos
-- Migración completa de hilos y posts existentes
-- Preservación de IDs y referencias
-- Compatibilidad con URLs existentes
-- Scripts de verificación de integridad
+### Data
+- Complete migration of existing threads and posts
+- Preservation of IDs and references
+- Compatibility with existing URLs
+- Integrity verification scripts
 
-### Experiencia
-- Período de transición con ambos sistemas
-- Feedback temprano de usuarios clave
-- Documentación completa de cambios
-- Canal dedicado para reporte de problemas
+### Experience
+- Transition period with both systems
+- Early feedback from key users
+- Complete documentation of changes
+- Dedicated channel for problem reporting
 
-## Tecnologías y Herramientas
+## Technologies and Tools
 
-### Desarrollo
+### Development
 - TypeScript
 - Node.js
 - React
@@ -248,8 +248,8 @@ El MVP del proyecto de modernización de 4chan tiene como objetivo desarrollar u
 ### Testing
 - Jest
 - Cypress
-- k6 (pruebas de carga)
-- OWASP ZAP (seguridad)
+- k6 (load testing)
+- OWASP ZAP (security)
 
 ### DevOps
 - GitHub Actions
@@ -257,10 +257,10 @@ El MVP del proyecto de modernización de 4chan tiene como objetivo desarrollar u
 - Prometheus/Grafana
 - ELK Stack
 
-## Conclusión
+## Conclusion
 
-Este MVP representa la primera fase crítica en la modernización de 4chan, estableciendo una base tecnológica sólida mientras preserva la experiencia esencial que ha definido la plataforma. El enfoque en seguridad, escalabilidad y mantenibilidad aborda las deficiencias críticas identificadas en el análisis, mientras que la arquitectura modular permitirá una evolución continua y sostenible del sistema en el futuro.
+This MVP represents the critical first phase in the modernization of 4chan, establishing a solid technological foundation while preserving the essential experience that has defined the platform. The focus on security, scalability, and maintainability addresses the critical deficiencies identified in the analysis, while the modular architecture will allow for continuous and sustainable evolution of the system in the future.
 
 ---
 
-*Nota: Este documento de MVP está sujeto a refinamiento basado en feedback adicional del equipo técnico y stakeholders clave.*
+*Note: This MVP document is subject to refinement based on additional feedback from the technical team and key stakeholders.*
