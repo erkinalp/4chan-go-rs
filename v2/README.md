@@ -65,5 +65,5 @@ Each component has its own README with specific instructions for development, te
 ```bash
 # To run the complete stack in development
 cd infrastructure
-docker-compose up
+docker compose up -d
 ```

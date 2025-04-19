@@ -22,73 +22,73 @@ help:
 
 .PHONY: up
 up:
-	docker-compose up -d
+	docker compose up -d
 
 .PHONY: down
 down:
-	docker-compose down
+	docker compose down
 
 .PHONY: build
 build:
-	docker-compose build
+	docker compose build
 
 .PHONY: restart
 restart:
-	docker-compose restart
+	docker compose restart
 
 .PHONY: logs
 logs:
-	docker-compose logs -f
+	docker compose logs -f
 
 .PHONY: shell-api
 shell-api:
-	docker-compose exec api sh
+	docker compose exec api sh
 
 .PHONY: shell-frontend
 shell-frontend:
-	docker-compose exec shell sh
+	docker compose exec shell sh
 
 .PHONY: clean
 clean:
-	docker-compose down -v --remove-orphans
+	docker compose down -v --remove-orphans
 
 .PHONY: migrate
 migrate:
-	docker-compose exec api npm run prisma:migrate
+	docker compose exec api npm run prisma:migrate
 
 .PHONY: generate
 generate:
-	docker-compose exec api npm run prisma:generate
+	docker compose exec api npm run prisma:generate
 
 .PHONY: test
 test:
-	docker-compose exec api npm test
+	docker compose exec api npm test
 
 .PHONY: lint
 lint:
-	docker-compose exec api npm run lint
-	docker-compose exec shell npm run lint
+	docker compose exec api npm run lint
+	docker compose exec shell npm run lint
 
 .PHONY: seed
 seed:
-	docker-compose exec api npm run seed
+	docker compose exec api npm run seed
 
 .PHONY: reset-db
 reset-db:
-	docker-compose exec api npm run prisma:reset
+	docker compose exec api npm run prisma:reset
 
 # Production-specific commands
 .PHONY: up-prod
 up-prod:
-	ENV=production docker-compose -f docker-compose.prod.yml up -d
+	ENV=production docker compose -f docker-compose.prod.yml up -d
 
 .PHONY: down-prod
 down-prod:
-	ENV=production docker-compose -f docker-compose.prod.yml down
+	ENV=production docker compose -f docker-compose.prod.yml down
 
 .PHONY: build-prod
 build-prod:
-	ENV=production docker-compose -f docker-compose.prod.yml build
+	ENV=production docker compose -f docker-compose.prod.yml build
 
 # Development utilities
 .PHONY: install-all
