@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/4chan/v2/backend_go/config"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -61,7 +64,19 @@ func (db *PostgresDB) Ping(ctx context.Context) error {
 
 // RunMigrations runs database migrations
 func (db *PostgresDB) RunMigrations() error {
-	// In a real application, we would implement migrations using a tool like golang-migrate
-	// For the purposes of this example, we'll return nil
+	// Use golang-migrate to run migrations
+	migrationDir := "file://migrations"
+	
+	// Create a new migrate instance
+	m, err := migrate.New(migrationDir, db.pool.Config().ConnConfig.ConnString())
+	if err != nil {
+		return fmt.Errorf("failed to create migrate instance: %w", err)
+	}
+	
+	// Run migrations
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+	
 	return nil
 }
