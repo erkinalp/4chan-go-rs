@@ -53,16 +53,15 @@ impl S3Repository {
     async fn ensure_bucket_exists(&self) -> Result<(), Box<dyn std::error::Error>> {
         let buckets = self.client.list_buckets().send().await?;
         
-        let bucket_exists = if let Some(bucket_list) = buckets.buckets() {
-            bucket_list.iter().any(|bucket| {
+        let bucket_exists = match buckets.buckets() {
+            Some(bucket_list) => bucket_list.iter().any(|bucket| {
                 if let Some(name) = bucket.name() {
                     name == self.bucket
                 } else {
                     false
                 }
-            })
-        } else {
-            false
+            }),
+            None => false
         };
             
         if !bucket_exists {
