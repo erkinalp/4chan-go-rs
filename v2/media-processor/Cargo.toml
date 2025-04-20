@@ -14,7 +14,7 @@ tokio-stream = "0.1.14"
 futures = "0.3.28"
 serde = { version = "1.0.171", features = ["derive"] }
 serde_json = "1.0.103"
-sqlx = { version = "0.8.1", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros", "chrono", "offline"] }
+sqlx = { version = "0.8.1", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros", "chrono"] }
 deadpool-redis = { version = "0.13.0", features = ["serde"] }
 aws-sdk-s3 = "1.6.1"
 aws-config = "1.6.1"
