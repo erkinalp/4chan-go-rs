@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
-use actix_web_prometheus::PrometheusMetricsBuilder;
-use prometheus::Registry;
+use actix_web_prom::PrometheusMetricsBuilder;
+use prometheus::registry::Registry;
 use std::net::TcpListener;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -68,9 +68,7 @@ async fn main() -> std::io::Result<()> {
     .expect("Failed to create S3 client");
 
     // Create a new registry for metrics
-    let registry = Registry::new();
     let prometheus = PrometheusMetricsBuilder::new("api")
-        .registry(registry)
         .endpoint("/metrics")
         .build()
         .unwrap();
