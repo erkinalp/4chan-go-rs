@@ -21,7 +21,9 @@ impl S3Repository {
         secret_key: &str,
         bucket: &str
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let region_provider = RegionProviderChain::first_try(region)
+        let region_owned = region.to_string();
+        
+        let region_provider = RegionProviderChain::first_try(region_owned)
             .or_default_provider();
             
         let credentials_provider = Credentials::new(
@@ -54,8 +56,11 @@ impl S3Repository {
     async fn ensure_bucket_exists(&self) -> Result<(), Box<dyn std::error::Error>> {
         let buckets = self.client.list_buckets().send().await?;
         
-        let bucket_list = buckets.buckets().unwrap_or(&[]);
-        let bucket_exists = bucket_list.iter().any(|bucket| bucket.name().unwrap_or_default() == self.bucket);
+        let bucket_exists = if let Some(bucket_list) = buckets.buckets() {
+            bucket_list.iter().any(|bucket| bucket.name().unwrap_or_default() == self.bucket)
+        } else {
+            false
+        };
             
         if !bucket_exists {
             self.client.create_bucket()
