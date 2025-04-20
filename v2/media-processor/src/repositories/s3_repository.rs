@@ -21,7 +21,7 @@ impl S3Repository {
         secret_key: &str,
         bucket: &str
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let region_provider = RegionProviderChain::first_try(region.to_string())
+        let region_provider = RegionProviderChain::first_try(region)
             .or_default_provider();
             
         let credentials_provider = Credentials::new(
@@ -54,10 +54,11 @@ impl S3Repository {
     async fn ensure_bucket_exists(&self) -> Result<(), Box<dyn std::error::Error>> {
         let buckets = self.client.list_buckets().send().await?;
         
-        let bucket_exists = buckets.buckets()
-            .unwrap_or(&[])
-            .iter()
-            .any(|bucket| bucket.name().unwrap_or_default() == self.bucket);
+        let bucket_exists = if let Some(bucket_list) = buckets.buckets() {
+            bucket_list.iter().any(|bucket| bucket.name().unwrap_or_default() == self.bucket)
+        } else {
+            false
+        };
             
         if !bucket_exists {
             self.client.create_bucket()
@@ -97,8 +98,7 @@ impl S3Repository {
         let timestamp = Utc::now().timestamp();
         let unique_filename = format!("{}_{}", timestamp, filename);
         
-        let md5 = md5::compute(file_data);
-        let content_md5 = md5.as_ref().to_vec();
+        let _md5 = md5::compute(file_data);
         
         self.client.put_object()
             .bucket(&self.bucket)
