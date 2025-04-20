@@ -1,6 +1,6 @@
 module github.com/4chan/v2/backend_go
 
-go 1.22
+go 1.23
 
 require (
 	github.com/gin-gonic/gin v1.9.1
@@ -16,5 +16,5 @@ require (
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.2
 	go.opentelemetry.io/otel v1.21.0
-	golang.org/x/crypto v0.31.0
+	golang.org/x/crypto v0.35.0
 )
