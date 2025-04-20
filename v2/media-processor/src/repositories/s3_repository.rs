@@ -16,7 +16,7 @@ pub struct S3Repository {
 impl S3Repository {
     pub async fn new(
         endpoint: &str,
-        region: &str,
+        region: String,
         access_key: &str, 
         secret_key: &str,
         bucket: &str
