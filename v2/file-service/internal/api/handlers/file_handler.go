@@ -15,43 +15,27 @@ import (
 	"time"
 
 	"github.com/4chan/v2/backend_go/internal/api/models"
+	"github.com/4chan/v2/backend_go/internal/repository"
 	"github.com/4chan/v2/backend_go/internal/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
-	"github.com/google/uuid"
 )
 
-// FileHandler handles file operations
 type FileHandler struct {
-	storage *storage.MinioClient
+	storage  *storage.MinioClient
+	fileRepo *repository.FileRepository
 }
 
-// NewFileHandler creates a new file handler
-func NewFileHandler(storage *storage.MinioClient) *FileHandler {
+func NewFileHandler(storage *storage.MinioClient, fileRepo *repository.FileRepository) *FileHandler {
 	return &FileHandler{
-		storage: storage,
+		storage:  storage,
+		fileRepo: fileRepo,
 	}
 }
 
-// Upload godoc
-// @Summary Upload a file
-// @Description Upload a file to be attached to a post
-// @Tags files
-// @Accept multipart/form-data
-// @Produce json
-// @Param file formData file true "File to upload"
-// @Param spoiler formData bool false "Mark file as spoiler"
-// @Success 201 {object} models.FileUploadResponse
-// @Failure 400 {object} models.Error
-// @Failure 401 {object} models.Error
-// @Failure 413 {object} models.Error
-// @Failure 415 {object} models.Error
-// @Failure 429 {object} models.Error
-// @Failure 500 {object} models.Error
-// @Router /files/upload [post]
 func (h *FileHandler) Upload(c *gin.Context) {
-	// Parse form with 16MB max memory
 	if err := c.Request.ParseMultipartForm(16 << 20); err != nil {
 		c.JSON(http.StatusBadRequest, models.Error{
 			StatusCode: http.StatusBadRequest,
@@ -61,7 +45,6 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// Get file from form
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.Error{
@@ -73,7 +56,6 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Check file size (10MB max)
 	maxSize := int64(10 << 20) // 10MB
 	if header.Size > maxSize {
 		c.JSON(http.StatusRequestEntityTooLarge, models.Error{
@@ -84,7 +66,6 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// Read file data
 	fileData, err := readFile(file, header.Size)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.Error{
@@ -95,7 +76,6 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// Validate file type
 	kind, err := filetype.Match(fileData)
 	if err != nil || kind == filetype.Unknown {
 		c.JSON(http.StatusUnsupportedMediaType, models.Error{
@@ -106,7 +86,6 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// Check if file type is allowed
 	if !isAllowedFileType(kind) {
 		c.JSON(http.StatusUnsupportedMediaType, models.Error{
 			StatusCode: http.StatusUnsupportedMediaType,
@@ -116,43 +95,56 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// Generate MD5 hash
 	hash := md5.Sum(fileData)
 	md5Hash := hex.EncodeToString(hash[:])
 
-	// Check for duplicate file by hash (in a real app, you would check the database)
-	// This is just a placeholder for demonstration
-	// isDuplicate := false
-	// if isDuplicate {
-	//     // Return existing file info
-	// }
+	existingFile, err := h.fileRepo.GetFileByMD5Hash(c.Request.Context(), md5Hash)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to check for duplicate file",
+			Error:      err.Error(),
+		})
+		return
+	}
 
-	// Parse spoiler parameter
+	if existingFile != nil {
+		c.JSON(http.StatusOK, models.FileUploadResponse{
+			ID:             existingFile.ID,
+			FileURL:        fmt.Sprintf("/files/%s/content", existingFile.ID),
+			ThumbnailURL:   fmt.Sprintf("/files/%s/thumbnail", existingFile.ID),
+			Filename:       existingFile.Filename,
+			Filesize:       existingFile.Filesize,
+			Width:          existingFile.Width,
+			Height:         existingFile.Height,
+			MimeType:       existingFile.MimeType,
+			MD5Hash:        existingFile.MD5Hash,
+			IsSpoilered:    existingFile.IsSpoilered,
+			UploadDuration: 0,
+		})
+		return
+	}
+
 	spoiler := false
 	spoilerStr := c.Request.FormValue("spoiler")
 	if spoilerStr != "" {
 		spoiler, _ = strconv.ParseBool(spoilerStr)
 	}
 
-	// Get file dimensions if it's an image
 	var width, height int
 	if isImage(kind) {
 		width, height, err = getImageDimensions(fileData)
 		if err != nil {
-			// Log the error but continue
 			fmt.Printf("Failed to get image dimensions: %v\n", err)
 		}
 	}
 
-	// Generate a unique file ID
 	fileID := uuid.New().String()
 
-	// Generate a unique filename
 	timestamp := time.Now().Unix()
 	ext := filepath.Ext(header.Filename)
 	uniqueFileName := fmt.Sprintf("%d_%s%s", timestamp, fileID, ext)
 
-	// Upload the file
 	uploadInfo, err := h.storage.UploadFile(c.Request.Context(), fileData, uniqueFileName, kind.MIME.Value)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.Error{
@@ -163,38 +155,49 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// In a real application, you would generate and store a thumbnail
-	// For now, we'll just use the same URL
 	thumbnailURL := uploadInfo.ThumbnailURL
 
-	// Build response
+	file := &models.File{
+		ID:                fileID,
+		Filename:          header.Filename,
+		StoredFilename:    uniqueFileName,
+		Filesize:          header.Size,
+		Width:             width,
+		Height:            height,
+		ThumbnailFilename: filepath.Base(thumbnailURL),
+		MimeType:          kind.MIME.Value,
+		MD5Hash:           md5Hash,
+		SHA256Hash:        "", // TODO: Calculate SHA256 hash
+		IsSpoilered:       spoiler,
+		CreatedAt:         time.Now(),
+	}
+
+	if err := h.fileRepo.CreateFile(c.Request.Context(), file); err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to save file metadata",
+			Error:      err.Error(),
+		})
+		return
+	}
+
 	response := models.FileUploadResponse{
-		ID:           fileID,
-		FileURL:      uploadInfo.URL,
-		ThumbnailURL: thumbnailURL,
-		Filename:     header.Filename,
-		Filesize:     header.Size,
-		Width:        width,
-		Height:       height,
-		MimeType:     kind.MIME.Value,
-		MD5Hash:      md5Hash,
-		IsSpoilered:  spoiler,
+		ID:             fileID,
+		FileURL:        uploadInfo.URL,
+		ThumbnailURL:   thumbnailURL,
+		Filename:       header.Filename,
+		Filesize:       header.Size,
+		Width:          width,
+		Height:         height,
+		MimeType:       kind.MIME.Value,
+		MD5Hash:        md5Hash,
+		IsSpoilered:    spoiler,
 		UploadDuration: 0, // In a real app, you would measure this
 	}
 
 	c.JSON(http.StatusCreated, response)
 }
 
-// GetFile godoc
-// @Summary Get file information
-// @Description Get metadata for a specific file
-// @Tags files
-// @Produce json
-// @Param fileId path string true "File ID"
-// @Success 200 {object} models.File
-// @Failure 404 {object} models.Error
-// @Failure 500 {object} models.Error
-// @Router /files/{fileId} [get]
 func (h *FileHandler) GetFile(c *gin.Context) {
 	fileID := c.Param("fileId")
 	if fileID == "" {
@@ -206,27 +209,28 @@ func (h *FileHandler) GetFile(c *gin.Context) {
 		return
 	}
 
-	// In a real application, you would look up the file in your database
-	// For now, we'll return a not found error
-	c.JSON(http.StatusNotFound, models.Error{
-		StatusCode: http.StatusNotFound,
-		Message:    "File not found",
-		Error:      fmt.Sprintf("No file found with ID: %s", fileID),
-	})
+	file, err := h.fileRepo.GetFileByID(c.Request.Context(), fileID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve file",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if file == nil {
+		c.JSON(http.StatusNotFound, models.Error{
+			StatusCode: http.StatusNotFound,
+			Message:    "File not found",
+			Error:      fmt.Sprintf("No file found with ID: %s", fileID),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, file)
 }
 
-// DeleteFile godoc
-// @Summary Delete a file
-// @Description Delete a file from the system
-// @Tags files
-// @Security BearerAuth
-// @Param fileId path string true "File ID"
-// @Success 204 "No Content"
-// @Failure 401 {object} models.Error
-// @Failure 403 {object} models.Error
-// @Failure 404 {object} models.Error
-// @Failure 500 {object} models.Error
-// @Router /files/{fileId} [delete]
 func (h *FileHandler) DeleteFile(c *gin.Context) {
 	fileID := c.Param("fileId")
 	if fileID == "" {
@@ -238,27 +242,46 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 		return
 	}
 
-	// In a real application, you would look up the file in your database
-	// Then delete it from storage and from the database
-	// For now, we'll return a not found error
-	c.JSON(http.StatusNotFound, models.Error{
-		StatusCode: http.StatusNotFound,
-		Message:    "File not found",
-		Error:      fmt.Sprintf("No file found with ID: %s", fileID),
-	})
+	file, err := h.fileRepo.GetFileByID(c.Request.Context(), fileID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve file",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if file == nil {
+		c.JSON(http.StatusNotFound, models.Error{
+			StatusCode: http.StatusNotFound,
+			Message:    "File not found",
+			Error:      fmt.Sprintf("No file found with ID: %s", fileID),
+		})
+		return
+	}
+
+	if err := h.storage.DeleteFile(c.Request.Context(), file.StoredFilename); err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to delete file from storage",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if err := h.fileRepo.DeleteFile(c.Request.Context(), fileID); err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to delete file from database",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
-// GetFileContent godoc
-// @Summary Get file content
-// @Description Download the content of a file
-// @Tags files
-// @Produce octet-stream
-// @Param fileId path string true "File ID"
-// @Param download query boolean false "Download file instead of viewing in browser"
-// @Success 200 {file} binary "File content"
-// @Failure 404 {object} models.Error
-// @Failure 500 {object} models.Error
-// @Router /files/{fileId}/content [get]
 func (h *FileHandler) GetFileContent(c *gin.Context) {
 	fileID := c.Param("fileId")
 	if fileID == "" {
@@ -270,34 +293,52 @@ func (h *FileHandler) GetFileContent(c *gin.Context) {
 		return
 	}
 
-	// Check download parameter
 	download := false
 	downloadStr := c.Query("download")
 	if downloadStr != "" {
 		download, _ = strconv.ParseBool(downloadStr)
 	}
 
-	// In a real application, you would look up the file in your database
-	// Then retrieve it from storage
-	// For now, we'll return a not found error
-	c.JSON(http.StatusNotFound, models.Error{
-		StatusCode: http.StatusNotFound,
-		Message:    "File not found",
-		Error:      fmt.Sprintf("No file found with ID: %s", fileID),
-	})
+	file, err := h.fileRepo.GetFileByID(c.Request.Context(), fileID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve file",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if file == nil {
+		c.JSON(http.StatusNotFound, models.Error{
+			StatusCode: http.StatusNotFound,
+			Message:    "File not found",
+			Error:      fmt.Sprintf("No file found with ID: %s", fileID),
+		})
+		return
+	}
+
+	fileContent, err := h.storage.GetFile(c.Request.Context(), file.StoredFilename)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve file content",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	contentDisposition := "inline"
+	if download {
+		contentDisposition = "attachment"
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("%s; filename=%s", contentDisposition, file.Filename))
+	c.Header("Content-Type", file.MimeType)
+	c.Header("Content-Length", fmt.Sprintf("%d", file.Filesize))
+
+	c.Data(http.StatusOK, file.MimeType, fileContent)
 }
 
-// GetThumbnail godoc
-// @Summary Get file thumbnail
-// @Description Get the thumbnail for a file
-// @Tags files
-// @Produce image/*
-// @Param fileId path string true "File ID"
-// @Param size query string false "Thumbnail size (small, medium, large)" default(medium)
-// @Success 200 {file} binary "Thumbnail image"
-// @Failure 404 {object} models.Error
-// @Failure 500 {object} models.Error
-// @Router /files/{fileId}/thumbnail [get]
 func (h *FileHandler) GetThumbnail(c *gin.Context) {
 	fileID := c.Param("fileId")
 	if fileID == "" {
@@ -309,33 +350,53 @@ func (h *FileHandler) GetThumbnail(c *gin.Context) {
 		return
 	}
 
-	// Get size parameter
 	size := c.DefaultQuery("size", "medium")
 	if size != "small" && size != "medium" && size != "large" {
 		size = "medium"
 	}
 
-	// In a real application, you would look up the thumbnail in your database
-	// Then retrieve it from storage with the appropriate size
-	// For now, we'll return a not found error
-	c.JSON(http.StatusNotFound, models.Error{
-		StatusCode: http.StatusNotFound,
-		Message:    "Thumbnail not found",
-		Error:      fmt.Sprintf("No thumbnail found for file ID: %s", fileID),
-	})
+	file, err := h.fileRepo.GetFileByID(c.Request.Context(), fileID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve file",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if file == nil {
+		c.JSON(http.StatusNotFound, models.Error{
+			StatusCode: http.StatusNotFound,
+			Message:    "File not found",
+			Error:      fmt.Sprintf("No file found with ID: %s", fileID),
+		})
+		return
+	}
+
+	thumbnailContent, err := h.storage.GetFile(c.Request.Context(), file.ThumbnailFilename)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve thumbnail",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	contentType := "image/jpeg" // Default
+	if strings.HasSuffix(file.ThumbnailFilename, ".png") {
+		contentType = "image/png"
+	} else if strings.HasSuffix(file.ThumbnailFilename, ".gif") {
+		contentType = "image/gif"
+	} else if strings.HasSuffix(file.ThumbnailFilename, ".webp") {
+		contentType = "image/webp"
+	}
+
+	c.Header("Content-Type", contentType)
+	c.Data(http.StatusOK, contentType, thumbnailContent)
 }
 
-// CheckFile godoc
-// @Summary Check if a file exists
-// @Description Check if a file with a specific MD5 hash already exists
-// @Tags files
-// @Accept json
-// @Produce json
-// @Param request body models.FileCheckRequest true "MD5 hash to check"
-// @Success 200 {object} models.FileCheckResponse
-// @Failure 400 {object} models.Error
-// @Failure 500 {object} models.Error
-// @Router /files/check [post]
 func (h *FileHandler) CheckFile(c *gin.Context) {
 	var request models.FileCheckRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -356,80 +417,57 @@ func (h *FileHandler) CheckFile(c *gin.Context) {
 		return
 	}
 
-	// In a real application, you would check if a file with this hash exists in your database
-	// For now, we'll always say it doesn't exist
+	file, err := h.fileRepo.GetFileByMD5Hash(c.Request.Context(), request.MD5Hash)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to check file existence",
+			Error:      err.Error(),
+		})
+		return
+	}
+
 	response := models.FileCheckResponse{
-		Exists: false,
-		File:   nil,
+		Exists: file != nil,
+		File:   file,
 	}
 
 	c.JSON(http.StatusOK, response)
 }
 
-// GetBannedHashes godoc
-// @Summary Get banned file hashes
-// @Description Get a list of MD5 hashes of banned files
-// @Tags files
-// @Produce json
-// @Success 200 {object} models.BannedHashesResponse
-// @Failure 500 {object} models.Error
-// @Router /files/banned [get]
 func (h *FileHandler) GetBannedHashes(c *gin.Context) {
-	// In a real application, you would retrieve this from your database
-	// For now, we'll return an empty list
+	bannedHashes, err := h.fileRepo.GetBannedHashes(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve banned hashes",
+			Error:      err.Error(),
+		})
+		return
+	}
+
 	response := models.BannedHashesResponse{
-		Data:      []string{},
+		Data:      bannedHashes,
 		UpdatedAt: time.Now(),
 	}
 
 	c.JSON(http.StatusOK, response)
 }
 
-// GetFileStats godoc
-// @Summary Get file statistics
-// @Description Get statistics about stored files
-// @Tags files
-// @Security BearerAuth
-// @Produce json
-// @Success 200 {object} models.FileStats
-// @Failure 401 {object} models.Error
-// @Failure 403 {object} models.Error
-// @Failure 500 {object} models.Error
-// @Router /files/stats [get]
 func (h *FileHandler) GetFileStats(c *gin.Context) {
-	// In a real application, you would calculate these statistics from your database
-	// For now, we'll return dummy data
-	response := models.FileStats{
-		TotalFiles:       1000000,
-		TotalSize:        5368709120, // 5GB
-		AverageFileSize:  5368709,    // ~5MB
-		FilesLastDay:     10000,
-		FilesLastWeek:    70000,
-		FilesByType: map[string]int{
-			"image/jpeg": 500000,
-			"image/png":  300000,
-			"image/gif":  150000,
-			"video/mp4":  50000,
-		},
+	stats, err := h.fileRepo.GetFileStats(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve file statistics",
+			Error:      err.Error(),
+		})
+		return
 	}
 
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, stats)
 }
 
-// PurgeFiles godoc
-// @Summary Purge old files
-// @Description Start a task to purge old files based on criteria
-// @Tags files
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param request body models.FilePurgeRequest true "Purge criteria"
-// @Success 202 {object} models.FilePurgeResponse
-// @Failure 400 {object} models.Error
-// @Failure 401 {object} models.Error
-// @Failure 403 {object} models.Error
-// @Failure 500 {object} models.Error
-// @Router /files/admin/purge [post]
 func (h *FileHandler) PurgeFiles(c *gin.Context) {
 	var request models.FilePurgeRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -450,8 +488,6 @@ func (h *FileHandler) PurgeFiles(c *gin.Context) {
 		return
 	}
 
-	// In a real application, you would start an async task to purge files
-	// For now, we'll just return a dummy response
 	response := models.FilePurgeResponse{
 		TaskID:              uuid.New().String(),
 		EstimatedFilesToPurge: 50000,
@@ -461,7 +497,6 @@ func (h *FileHandler) PurgeFiles(c *gin.Context) {
 	c.JSON(http.StatusAccepted, response)
 }
 
-// Helper function to read file
 func readFile(file multipart.File, size int64) ([]byte, error) {
 	buffer := make([]byte, size)
 	_, err := io.ReadFull(file, buffer)
@@ -471,9 +506,7 @@ func readFile(file multipart.File, size int64) ([]byte, error) {
 	return buffer, nil
 }
 
-// Helper function to check if file type is allowed
 func isAllowedFileType(kind filetype.Type) bool {
-	// List of allowed MIME types
 	allowedTypes := map[string]bool{
 		"image/jpeg":             true,
 		"image/png":              true,
@@ -489,15 +522,10 @@ func isAllowedFileType(kind filetype.Type) bool {
 	return allowedTypes[kind.MIME.Value]
 }
 
-// Helper function to check if file is an image
 func isImage(kind filetype.Type) bool {
 	return kind.MIME.Type == "image"
 }
 
-// Helper function to get image dimensions
-// In a real application, you would use an image processing library
 func getImageDimensions(fileData []byte) (width, height int, err error) {
-	// Dummy implementation - in a real app you would use an image library
-	// This is just a placeholder
 	return 800, 600, nil
 }
