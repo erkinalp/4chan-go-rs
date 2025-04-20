@@ -131,14 +131,14 @@ pub async fn upload_file(
     let file = File {
         id: file_id,
         filename,
-        stored_filename: unique_filename.clone(),
+        stored_filename: Some(unique_filename.clone()),
         filesize: file_data.len() as i64,
         width,
         height,
-        thumbnail_filename: thumbnail_url.clone(),
+        thumbnail_filename: Some(thumbnail_url.clone()),
         mime_type: content_type.clone(),
         md5_hash: md5_hash.clone(),
-        sha256_hash: "".to_string(), // TODO: Calculate SHA256 hash
+        sha256_hash: Some("".to_string()), // TODO: Calculate SHA256 hash
         is_spoilered,
         created_at: Utc::now(),
         post_id: None,

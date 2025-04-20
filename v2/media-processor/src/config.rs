@@ -90,30 +90,21 @@ impl Config {
         // Load .env file if it exists
         dotenv::dotenv().ok();
 
-        // Set default configuration
-        let mut s = ConfigLib::default();
-        
-        // Read default configuration
-        s.merge(File::with_name("config/default")
-            .required(false))?;
-
-        // Read environment-specific config file if specified
         let env = env::var("RUN_ENV").unwrap_or_else(|_| "development".into());
-        s.merge(File::with_name(&format!("config/{}", env))
-            .required(false))?;
-
-        // Add in settings from environment variables (with a prefix of APP)
-        // E.g. APP_SERVER__PORT=8080 would set server.port
-        s.merge(Environment::with_prefix("app")
-            .separator("__"))?;
-
-        // Parse Neon database URL if using a standard URL format
-        if let Ok(database_url) = env::var("DATABASE_URL") {
-            s.set("database.connection_string", database_url)?;
+        let database_url = env::var("DATABASE_URL").ok();
+        
+        let mut builder = ConfigLib::builder()
+            .add_source(File::with_name("config/default").required(false))
+            .add_source(File::with_name(&format!("config/{}", env)).required(false))
+            .add_source(Environment::with_prefix("app").separator("__"));
+        
+        if let Some(url) = database_url {
+            builder = builder.set_override("database.connection_string", url)?;
         }
 
-        // Deserialize configuration
-        s.try_into()
+        // Build and deserialize configuration
+        let config = builder.build()?;
+        config.try_into()
     }
 }
 
