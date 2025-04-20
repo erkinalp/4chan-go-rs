@@ -3,7 +3,8 @@ use chrono::{DateTime, Utc};
 use sqlx::{postgres::PgRow, Row};
 use uuid::Uuid;
 
-use crate::models::{File, FileStats};
+
+use crate::models::file::{File, FileStats};
 use crate::repositories::postgres_repository::PostgresRepository;
 
 pub struct FileRepository {
@@ -41,6 +42,8 @@ impl FileRepository {
                     is_spoilered: row.get("is_spoilered"),
                     created_at: row.get("created_at"),
                     post_id: row.get("post_id"),
+                    file_url: format!("/files/{}/content", row.get::<Uuid, _>("id")),
+                    thumbnail_url: format!("/files/{}/thumbnail", row.get::<Uuid, _>("id")),
                 }
             })
             .fetch_optional(&self.postgres.pool)
@@ -76,6 +79,8 @@ impl FileRepository {
                     is_spoilered: row.get("is_spoilered"),
                     created_at: row.get("created_at"),
                     post_id: row.get("post_id"),
+                    file_url: format!("/files/{}/content", row.get::<Uuid, _>("id")),
+                    thumbnail_url: format!("/files/{}/thumbnail", row.get::<Uuid, _>("id")),
                 }
             })
             .fetch_optional(&self.postgres.pool)
@@ -139,6 +144,137 @@ impl FileRepository {
             .await?;
 
         Ok(result)
+    }
+
+    pub async fn is_hash_banned(&self, md5_hash: &str) -> Result<bool> {
+        let query = r#"
+            SELECT COUNT(*) > 0 as is_banned
+            FROM banned_files
+            WHERE md5_hash = $1 AND is_active = true
+        "#;
+
+        let is_banned = sqlx::query_scalar::<_, bool>(query)
+            .bind(md5_hash)
+            .fetch_one(&self.postgres.pool)
+            .await?;
+
+        Ok(is_banned)
+    }
+
+    pub async fn find_by_hash(&self, md5_hash: &str) -> Result<Option<File>> {
+        self.get_file_by_md5_hash(md5_hash).await
+    }
+
+    pub async fn find_by_id(&self, file_id: &Uuid) -> Result<Option<File>> {
+        self.get_file_by_id(file_id).await
+    }
+
+    pub async fn estimate_purge(
+        &self,
+        older_than_days: i32,
+        mime_types: Option<&Vec<String>>,
+        except_board_ids: Option<&Vec<Uuid>>
+    ) -> Result<(i32, i64)> {
+        let mut query = r#"
+            SELECT COUNT(*) as file_count, COALESCE(SUM(filesize), 0) as total_size
+            FROM files
+            WHERE created_at < NOW() - INTERVAL '$1 days'
+        "#.to_string();
+
+        if let Some(types) = mime_types {
+            if !types.is_empty() {
+                query.push_str(" AND mime_type = ANY($2)");
+            }
+        }
+
+        if let Some(board_ids) = except_board_ids {
+            if !board_ids.is_empty() {
+                query.push_str(" AND post_id NOT IN (SELECT id FROM posts WHERE board_id = ANY($3))");
+            }
+        }
+
+        let mut q = sqlx::query_as::<_, (i32, i64)>(&query)
+            .bind(older_than_days);
+
+        if let Some(types) = mime_types {
+            if !types.is_empty() {
+                q = q.bind(types);
+            }
+        }
+
+        if let Some(board_ids) = except_board_ids {
+            if !board_ids.is_empty() {
+                q = q.bind(board_ids);
+            }
+        }
+
+        let (file_count, total_size) = q.fetch_one(&self.postgres.pool).await?;
+
+        Ok((file_count, total_size))
+    }
+
+    pub async fn purge_files(
+        &self,
+        older_than_days: i32,
+        mime_types: Option<&Vec<String>>,
+        except_board_ids: Option<&Vec<Uuid>>,
+        s3_repo: Option<&crate::repositories::s3_repository::S3Repository>
+    ) -> Result<(i32, i64)> {
+        let mut query = r#"
+            SELECT id, stored_filename
+            FROM files
+            WHERE created_at < NOW() - INTERVAL '$1 days'
+        "#.to_string();
+
+        if let Some(types) = mime_types {
+            if !types.is_empty() {
+                query.push_str(" AND mime_type = ANY($2)");
+            }
+        }
+
+        if let Some(board_ids) = except_board_ids {
+            if !board_ids.is_empty() {
+                query.push_str(" AND post_id NOT IN (SELECT id FROM posts WHERE board_id = ANY($3))");
+            }
+        }
+
+        let mut q = sqlx::query_as::<_, (Uuid, Option<String>)>(&query)
+            .bind(older_than_days);
+
+        if let Some(types) = mime_types {
+            if !types.is_empty() {
+                q = q.bind(types);
+            }
+        }
+
+        if let Some(board_ids) = except_board_ids {
+            if !board_ids.is_empty() {
+                q = q.bind(board_ids);
+            }
+        }
+
+        let files_to_delete = q.fetch_all(&self.postgres.pool).await?;
+        
+        let mut deleted_count = 0;
+        let mut freed_space = 0;
+
+        if let Some(s3) = s3_repo {
+            for (file_id, stored_filename) in &files_to_delete {
+                if let Err(e) = s3.delete_file(file_id, stored_filename).await {
+                    log::error!("Failed to delete file from S3: {}", e);
+                }
+            }
+        }
+
+        for (file_id, _) in files_to_delete {
+            if let Ok(deleted) = self.delete_file(&file_id).await {
+                if deleted {
+                    deleted_count += 1;
+                }
+            }
+        }
+
+        Ok((deleted_count, freed_space))
     }
 
     pub async fn get_file_stats(&self) -> Result<FileStats> {

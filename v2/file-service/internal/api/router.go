@@ -29,6 +29,7 @@ func NewRouter(
 	router.Use(middleware.Recovery(logger))
 	router.Use(middleware.CORS(cfg.CORS))
 	router.Use(middleware.Security())
+	router.Use(middleware.PrometheusMiddleware())
 
 	// Rate limiter
 	if cfg.RateLimit.Enabled {

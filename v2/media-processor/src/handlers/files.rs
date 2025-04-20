@@ -1,15 +1,16 @@
-use actix_web::{web, HttpResponse, HttpRequest, Error, error};
-use actix_multipart::Multipart;
+use actix_web::{web, HttpResponse, Error, error};
+use actix_multipart::{Field, Multipart};
+use actix_web::http::header::ContentDisposition;
 use chrono::Utc;
 use futures::{StreamExt, TryStreamExt};
-use serde_json::json;
-use uuid::Uuid;
+use image::{GenericImageView, ImageFormat};
 use std::collections::HashMap;
-use std::io::Read;
 use std::time::Instant;
+use uuid::Uuid;
+
 
 use crate::config::Config;
-use crate::models::{
+use crate::models::file::{
     File, 
     FileUploadResponse,
     FileCheckRequest,
@@ -21,368 +22,348 @@ use crate::models::{
 };
 use crate::repositories::s3_repository::S3Repository;
 use crate::repositories::file_repository::FileRepository;
-use crate::error::AppError;
-
-const MAX_FILE_SIZE: usize = 10 * 1024 * 1024; // 10MB
+use crate::utils;
 
 pub async fn upload_file(
-    req: HttpRequest,
-    mut payload: Multipart,
+    multipart: Multipart,
     s3_repo: web::Data<S3Repository>,
     file_repo: web::Data<FileRepository>,
     config: web::Data<Config>
 ) -> Result<HttpResponse, Error> {
     let start_time = Instant::now();
-    
-    let mut file_data: Option<Vec<u8>> = None;
-    let mut filename: Option<String> = None;
-    let mut content_type: Option<String> = None;
+    let mut file_data = Vec::new();
+    let mut filename = String::new();
+    let mut content_type = String::new();
     let mut is_spoiler = false;
     
-    while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_disposition = field.content_disposition().ok_or_else(|| {
-            error::ErrorBadRequest("Content disposition is missing")
-        })?;
+    let mut multipart = multipart;
+    
+    while let Some(item) = multipart.next().await {
+        let mut field = item?;
         
-        let field_name = content_disposition.get_name().ok_or_else(|| {
-            error::ErrorBadRequest("Field name is missing")
-        })?.to_string();
+        let content_disposition = field.content_disposition().clone();
         
-        match field_name.as_str() {
+        let field_name = content_disposition.get_name()
+            .ok_or_else(|| error::ErrorBadRequest("Field name is missing"))?;
+        
+        match field_name {
             "file" => {
-                filename = content_disposition.get_filename().map(|s| s.to_string());
+                filename = content_disposition.get_filename()
+                    .ok_or_else(|| error::ErrorBadRequest("Filename is missing"))?
+                    .to_string();
                 
-                content_type = field.content_type().map(|ct| ct.to_string());
+                content_type = field.content_type().map_or(
+                    "application/octet-stream".to_string(),
+                    |ct| ct.to_string()
+                );
                 
-                let mut data = Vec::new();
                 while let Some(chunk) = field.next().await {
-                    let chunk = chunk?;
-                    if data.len() + chunk.len() > MAX_FILE_SIZE {
-                        return Err(error::ErrorPayloadTooLarge("File too large").into());
-                    }
-                    data.extend_from_slice(&chunk);
+                    let data = chunk?;
+                    file_data.extend_from_slice(&data);
                 }
-                
-                if data.is_empty() {
-                    return Err(error::ErrorBadRequest("Empty file").into());
-                }
-                
-                file_data = Some(data);
             },
-            "spoiler" => {
+            "is_spoiler" => {
                 let mut value = String::new();
                 while let Some(chunk) = field.next().await {
-                    let chunk = chunk?;
-                    value.extend(std::str::from_utf8(&chunk).unwrap_or_default().chars());
+                    let data = chunk?;
+                    value.extend(std::str::from_utf8(&data).unwrap_or_default().chars());
                 }
-                is_spoiler = value.trim().to_lowercase() == "true";
+                is_spoiler = value == "true";
             },
             _ => {
-                while let Some(_) = field.next().await {
-                }
+                while let Some(_) = field.next().await {}
             }
         }
     }
     
-    let file_data = file_data.ok_or_else(|| error::ErrorBadRequest("File is required"))?;
-    let filename = filename.ok_or_else(|| error::ErrorBadRequest("Filename is missing"))?;
+    if file_data.is_empty() {
+        return Err(error::ErrorBadRequest("No file data provided"));
+    }
     
-    let content_type = content_type.unwrap_or_else(|| "application/octet-stream".to_string());
-    
-    let file_id = Uuid::new_v4();
+    if file_data.len() > config.files.max_size as usize {
+        return Err(error::ErrorBadRequest(format!(
+            "File too large. Maximum size is {} bytes",
+            config.files.max_size
+        )));
+    }
     
     let md5_hash = format!("{:x}", md5::compute(&file_data));
     
-    match file_repo.get_file_by_md5_hash(&md5_hash).await {
-        Ok(Some(existing_file)) => {
-            let response = FileUploadResponse {
-                id: existing_file.id,
-                file_url: format!("/files/{}/content", existing_file.id),
-                thumbnail_url: format!("/files/{}/thumbnail", existing_file.id),
-                filename: existing_file.filename,
-                filesize: existing_file.filesize,
-                width: existing_file.width,
-                height: existing_file.height,
-                mime_type: existing_file.mime_type,
-                md5_hash: existing_file.md5_hash,
-                is_spoilered: existing_file.is_spoilered,
-                upload_duration: Some(0),
-            };
-            return Ok(HttpResponse::Ok().json(response));
-        },
-        Ok(None) => {
-        },
-        Err(e) => {
-            return Err(error::ErrorInternalServerError(format!("Failed to check for duplicate file: {}", e)).into());
-        }
+    if file_repo.get_ref().is_hash_banned(&md5_hash).await.map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))? {
+        return Err(error::ErrorBadRequest("This file has been banned"));
     }
     
+    if let Some(existing_file) = file_repo.get_ref().get_file_by_md5_hash(&md5_hash).await.map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))? {
+        let upload_duration = start_time.elapsed().as_millis() as i32;
+        
+        let response = FileUploadResponse {
+            id: existing_file.id,
+            file_url: existing_file.file_url,
+            thumbnail_url: existing_file.thumbnail_url,
+            filename: existing_file.filename,
+            filesize: existing_file.filesize,
+            width: existing_file.width,
+            height: existing_file.height,
+            mime_type: existing_file.mime_type,
+            md5_hash: existing_file.md5_hash,
+            is_spoilered: existing_file.is_spoilered,
+            upload_duration: Some(upload_duration),
+        };
+        
+        return Ok(HttpResponse::Ok().json(response));
+    }
     
-    let (width, height) = (None, None);
-    
-    let unique_filename = format!("{}_{}", Utc::now().timestamp(), filename);
-    let (file_url, thumbnail_url) = match s3_repo.upload_file(&file_id, &file_data, &unique_filename, &content_type).await {
-        Ok((file_url, thumb_url)) => (file_url, thumb_url),
-        Err(e) => return Err(error::ErrorInternalServerError(format!("Failed to upload file: {}", e)).into()),
+    let (width, height) = if content_type.starts_with("image/") {
+        match image::load_from_memory(&file_data) {
+            Ok(img) => {
+                let dimensions = img.dimensions();
+                (Some(dimensions.0 as i32), Some(dimensions.1 as i32))
+            },
+            Err(_) => (None, None)
+        }
+    } else {
+        (None, None)
     };
     
-    let upload_duration = start_time.elapsed().as_millis() as i32;
+    let file_id = uuid::Uuid::new_v4();
+    let (file_url, thumbnail_url) = s3_repo.get_ref().upload_file(
+        &file_id,
+        &file_data,
+        &filename,
+        &content_type
+    ).await.map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
     
     let file = File {
         id: file_id,
         filename,
-        stored_filename: unique_filename.clone(),
+        stored_filename: Some(file_url.clone()),
         filesize: file_data.len() as i64,
         width,
         height,
-        thumbnail_filename: thumbnail_url.clone(),
+        thumbnail_filename: Some(thumbnail_url.clone()),
         mime_type: content_type.clone(),
         md5_hash: md5_hash.clone(),
-        sha256_hash: "".to_string(), // TODO: Calculate SHA256 hash
-        is_spoilered,
+        sha256_hash: Some("".to_string()), // TODO: Calculate SHA256 hash
+        is_spoilered: is_spoiler,
         created_at: Utc::now(),
         post_id: None,
+        file_url: file_url.clone(),
+        thumbnail_url: thumbnail_url.clone(),
     };
     
-    if let Err(e) = file_repo.create_file(&file).await {
-        return Err(error::ErrorInternalServerError(format!("Failed to save file metadata: {}", e)).into());
+    if let Err(e) = file_repo.get_ref().create_file(&file).await {
+        let _ = s3_repo.get_ref().delete_file(&file_id, &Some(file_url)).await;
+        return Err(error::ErrorInternalServerError(format!("Failed to save file metadata: {}", e)));
     }
     
+    let upload_duration = start_time.elapsed().as_millis() as i32;
+    
     let response = FileUploadResponse {
-        id: file_id,
+        id: file.id,
         file_url,
         thumbnail_url,
         filename: file.filename,
         filesize: file.filesize,
-        width,
-        height,
-        mime_type: content_type,
+        width: file.width,
+        height: file.height,
+        mime_type: file.mime_type,
         md5_hash,
-        is_spoilered,
+        is_spoilered: is_spoiler,
         upload_duration: Some(upload_duration),
     };
     
-    Ok(HttpResponse::Created().json(response))
+    Ok(HttpResponse::Ok().json(response))
 }
 
 pub async fn get_file_info(
     path: web::Path<String>,
-    file_repo: web::Data<FileRepository>,
+    file_repo: web::Data<FileRepository>
 ) -> Result<HttpResponse, Error> {
-    let file_id = path.into_inner();
+    let file_id = uuid::Uuid::parse_str(&path.into_inner())
+        .map_err(|_| error::ErrorBadRequest("Invalid file ID"))?;
     
-    let file_id = match Uuid::parse_str(&file_id) {
-        Ok(id) => id,
-        Err(_) => return Err(error::ErrorBadRequest("Invalid file ID").into()),
-    };
+    let file = file_repo.get_ref().get_file_by_id(&file_id).await
+        .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?
+        .ok_or_else(|| error::ErrorNotFound("File not found"))?;
     
-    match file_repo.get_file_by_id(&file_id).await {
-        Ok(Some(file)) => {
-            Ok(HttpResponse::Ok().json(file))
-        },
-        Ok(None) => {
-            Err(error::ErrorNotFound("File not found").into())
-        },
-        Err(e) => {
-            Err(error::ErrorInternalServerError(format!("Failed to retrieve file: {}", e)).into())
-        }
-    }
+    Ok(HttpResponse::Ok().json(file))
 }
 
 pub async fn delete_file(
-    req: HttpRequest,
     path: web::Path<String>,
     s3_repo: web::Data<S3Repository>,
-    file_repo: web::Data<FileRepository>,
+    file_repo: web::Data<FileRepository>
 ) -> Result<HttpResponse, Error> {
-    let file_id = path.into_inner();
+    let file_id = uuid::Uuid::parse_str(&path.into_inner())
+        .map_err(|_| error::ErrorBadRequest("Invalid file ID"))?;
     
-    let file_id = match Uuid::parse_str(&file_id) {
-        Ok(id) => id,
-        Err(_) => return Err(error::ErrorBadRequest("Invalid file ID").into()),
-    };
+    let file = file_repo.get_ref().get_file_by_id(&file_id).await
+        .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?
+        .ok_or_else(|| error::ErrorNotFound("File not found"))?;
     
-    let file = match file_repo.get_file_by_id(&file_id).await {
-        Ok(Some(file)) => file,
-        Ok(None) => return Err(error::ErrorNotFound("File not found").into()),
-        Err(e) => return Err(error::ErrorInternalServerError(format!("Failed to retrieve file: {}", e)).into()),
-    };
+    s3_repo.get_ref().delete_file(&file_id, &file.stored_filename).await
+        .map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
     
-    if let Err(e) = s3_repo.delete_file(&file_id, &file.stored_filename).await {
-        return Err(error::ErrorInternalServerError(format!("Failed to delete file from storage: {}", e)).into());
-    }
+    file_repo.get_ref().delete_file(&file_id).await
+        .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?;
     
-    match file_repo.delete_file(&file_id).await {
-        Ok(true) => Ok(HttpResponse::NoContent().finish()),
-        Ok(false) => Err(error::ErrorNotFound("File not found").into()),
-        Err(e) => Err(error::ErrorInternalServerError(format!("Failed to delete file from database: {}", e)).into()),
-    }
+    Ok(HttpResponse::NoContent().finish())
 }
 
 pub async fn get_file_content(
-    req: HttpRequest,
     path: web::Path<String>,
     query: web::Query<HashMap<String, String>>,
     s3_repo: web::Data<S3Repository>,
-    file_repo: web::Data<FileRepository>,
+    file_repo: web::Data<FileRepository>
 ) -> Result<HttpResponse, Error> {
-    let file_id = path.into_inner();
+    let file_id = uuid::Uuid::parse_str(&path.into_inner())
+        .map_err(|_| error::ErrorBadRequest("Invalid file ID"))?;
     
-    let file_id = match Uuid::parse_str(&file_id) {
-        Ok(id) => id,
-        Err(_) => return Err(error::ErrorBadRequest("Invalid file ID").into()),
-    };
+    let file = file_repo.get_ref().get_file_by_id(&file_id).await
+        .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?
+        .ok_or_else(|| error::ErrorNotFound("File not found"))?;
     
-    let download = query.get("download")
-        .map(|v| v.to_lowercase() == "true")
-        .unwrap_or(false);
+    let download = query.get("download").map_or(false, |v| v == "true");
     
-    let file = match file_repo.get_file_by_id(&file_id).await {
-        Ok(Some(file)) => file,
-        Ok(None) => return Err(error::ErrorNotFound("File not found").into()),
-        Err(e) => return Err(error::ErrorInternalServerError(format!("Failed to retrieve file: {}", e)).into()),
-    };
-    
-    let file_data = match s3_repo.get_file(&file_id, &file.stored_filename).await {
-        Ok(data) => data,
-        Err(e) => return Err(error::ErrorInternalServerError(format!("Failed to retrieve file content: {}", e)).into()),
-    };
-    
-    let content_disposition = if download {
-        format!("attachment; filename=\"{}\"", file.filename)
+    if download {
+        let url = s3_repo.get_ref().get_presigned_url(
+            &file.stored_filename.as_ref().unwrap_or(&String::new()),
+            3600 // 1 hour
+        ).await.map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
+        
+        return Ok(HttpResponse::TemporaryRedirect()
+            .append_header(("Location", url))
+            .finish());
     } else {
-        format!("inline; filename=\"{}\"", file.filename)
-    };
-    
-    Ok(HttpResponse::Ok()
-        .content_type(file.mime_type)
-        .header("Content-Disposition", content_disposition)
-        .body(file_data))
+        let data = s3_repo.get_ref().get_file(&file_id, &file.stored_filename).await
+            .map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
+        
+        let mut response = HttpResponse::Ok();
+        response.content_type(file.mime_type.clone());
+        
+        Ok(response.body(data))
+    }
 }
 
 pub async fn get_thumbnail(
-    req: HttpRequest,
     path: web::Path<String>,
     query: web::Query<HashMap<String, String>>,
     s3_repo: web::Data<S3Repository>,
-    file_repo: web::Data<FileRepository>,
+    file_repo: web::Data<FileRepository>
 ) -> Result<HttpResponse, Error> {
-    let file_id = path.into_inner();
+    let file_id = uuid::Uuid::parse_str(&path.into_inner())
+        .map_err(|_| error::ErrorBadRequest("Invalid file ID"))?;
     
-    let file_id = match Uuid::parse_str(&file_id) {
-        Ok(id) => id,
-        Err(_) => return Err(error::ErrorBadRequest("Invalid file ID").into()),
-    };
+    let file = file_repo.get_ref().get_file_by_id(&file_id).await
+        .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?
+        .ok_or_else(|| error::ErrorNotFound("File not found"))?;
     
-    let size = query.get("size")
-        .map(|s| s.as_str())
-        .unwrap_or("medium");
+    let size = query.get("size").unwrap_or(&"small".to_string()).to_string();
     
-    if !["small", "medium", "large"].contains(&size) {
-        return Err(error::ErrorBadRequest("Invalid thumbnail size").into());
-    }
+    let data = s3_repo.get_ref().get_thumbnail(&file_id, &file.thumbnail_filename, &size).await
+        .map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
     
-    let file = match file_repo.get_file_by_id(&file_id).await {
-        Ok(Some(file)) => file,
-        Ok(None) => return Err(error::ErrorNotFound("File not found").into()),
-        Err(e) => return Err(error::ErrorInternalServerError(format!("Failed to retrieve file: {}", e)).into()),
-    };
+    let mut response = HttpResponse::Ok();
     
-    let thumbnail_data = match s3_repo.get_thumbnail(&file_id, &file.thumbnail_filename, size).await {
-        Ok(data) => data,
-        Err(e) => return Err(error::ErrorInternalServerError(format!("Failed to retrieve thumbnail: {}", e)).into()),
-    };
-    
-    let content_type = if file.thumbnail_filename.ends_with(".png") {
-        "image/png"
-    } else if file.thumbnail_filename.ends_with(".gif") {
-        "image/gif"
-    } else if file.thumbnail_filename.ends_with(".webp") {
-        "image/webp"
+    let thumbnail_type = if file.mime_type.starts_with("image/") {
+        file.mime_type.clone()
     } else {
-        "image/jpeg" // Default
+        "image/jpeg".to_string()
     };
     
-    Ok(HttpResponse::Ok()
-        .content_type(content_type)
-        .body(thumbnail_data))
+    response.content_type(thumbnail_type);
+    
+    Ok(response.body(data))
 }
 
 pub async fn check_file_exists(
-    req: HttpRequest,
     request: web::Json<FileCheckRequest>,
-    file_repo: web::Data<FileRepository>,
+    file_repo: web::Data<FileRepository>
 ) -> Result<HttpResponse, Error> {
-    if request.md5_hash.is_empty() {
-        return Err(error::ErrorBadRequest("MD5 hash is required").into());
-    }
+    let md5_hash = &request.md5_hash;
     
-    match file_repo.get_file_by_md5_hash(&request.md5_hash).await {
-        Ok(Some(file)) => {
-            let response = FileCheckResponse {
-                exists: true,
-                file: Some(file),
-            };
-            Ok(HttpResponse::Ok().json(response))
-        },
-        Ok(None) => {
-            let response = FileCheckResponse {
-                exists: false,
-                file: None,
-            };
-            Ok(HttpResponse::Ok().json(response))
-        },
-        Err(e) => {
-            Err(error::ErrorInternalServerError(format!("Failed to check file existence: {}", e)).into())
-        }
-    }
+    let file = file_repo.get_ref().get_file_by_md5_hash(md5_hash).await
+        .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?;
+    
+    let response = FileCheckResponse {
+        exists: file.is_some(),
+        file,
+    };
+    
+    Ok(HttpResponse::Ok().json(response))
 }
 
 pub async fn get_banned_hashes(
-    req: HttpRequest,
-    file_repo: web::Data<FileRepository>,
+    file_repo: web::Data<FileRepository>
 ) -> Result<HttpResponse, Error> {
-    match file_repo.get_banned_hashes().await {
-        Ok(hashes) => {
-            let response = BannedHashesResponse {
-                data: hashes,
-                updated_at: Utc::now(),
-            };
-            Ok(HttpResponse::Ok().json(response))
-        },
-        Err(e) => {
-            Err(error::ErrorInternalServerError(format!("Failed to retrieve banned hashes: {}", e)).into())
-        }
-    }
+    let hashes = file_repo.get_ref().get_banned_hashes().await
+        .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?;
+    
+    let response = BannedHashesResponse {
+        data: hashes,
+        updated_at: Utc::now(),
+    };
+    
+    Ok(HttpResponse::Ok().json(response))
 }
 
 pub async fn get_file_stats(
-    req: HttpRequest,
-    file_repo: web::Data<FileRepository>,
+    file_repo: web::Data<FileRepository>
 ) -> Result<HttpResponse, Error> {
-    match file_repo.get_file_stats().await {
-        Ok(stats) => {
-            Ok(HttpResponse::Ok().json(stats))
-        },
-        Err(e) => {
-            Err(error::ErrorInternalServerError(format!("Failed to retrieve file statistics: {}", e)).into())
-        }
-    }
+    let stats = file_repo.get_ref().get_file_stats().await
+        .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?;
+    
+    Ok(HttpResponse::Ok().json(stats))
 }
 
 pub async fn purge_files(
-    req: HttpRequest,
     request: web::Json<FilePurgeRequest>,
+    s3_repo: web::Data<S3Repository>,
+    file_repo: web::Data<FileRepository>
 ) -> Result<HttpResponse, Error> {
-    if request.older_than_days < 30 {
-        return Err(error::ErrorBadRequest("olderThanDays must be at least 30").into());
+    let task_id = uuid::Uuid::new_v4();
+    
+    let except_board_ids = if let Some(board_ids) = request.except_board_ids.as_ref() {
+        let uuid_board_ids: Result<Vec<Uuid>, _> = board_ids.iter()
+            .map(|id| Uuid::parse_str(id))
+            .collect();
+        
+        match uuid_board_ids {
+            Ok(ids) => Some(ids),
+            Err(e) => return Err(error::ErrorBadRequest(format!("Invalid board ID: {}", e)))
+        }
+    } else {
+        None
+    };
+    
+    let (estimated_files, estimated_size) = file_repo.get_ref().estimate_purge(
+        request.older_than_days,
+        request.mime_types.as_ref(),
+        except_board_ids.as_ref()
+    ).await.map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?;
+    
+    if !request.dry_run {
+        let older_than_days = request.older_than_days;
+        let mime_types = request.mime_types.clone();
+        let except_board_ids_clone = except_board_ids.clone();
+        let s3_repo_clone = s3_repo.clone();
+        let file_repo_clone = file_repo.clone();
+        
+        tokio::spawn(async move {
+            let _ = file_repo_clone.get_ref().purge_files(
+                older_than_days,
+                mime_types.as_ref(),
+                except_board_ids_clone.as_ref(),
+                Some(s3_repo_clone.get_ref())
+            ).await;
+        });
     }
     
     let response = FilePurgeResponse {
-        task_id: Uuid::new_v4(),
-        estimated_files_to_purge: 50000,
-        estimated_space_to_free: 268435456, // 256MB
+        task_id,
+        estimated_files_to_purge: estimated_files,
+        estimated_space_to_free: estimated_size,
     };
     
-    Ok(HttpResponse::Accepted().json(response))
+    Ok(HttpResponse::Ok().json(response))
 }

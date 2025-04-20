@@ -1,6 +1,4 @@
-use actix_web::{web, HttpResponse, Scope};
-use actix_multipart::Multipart;
-use uuid::Uuid;
+use actix_web::{web, Scope};
 use crate::handlers::files::{
     upload_file, 
     get_file_info, 
@@ -17,7 +15,6 @@ use crate::middleware::{jwt_auth, require_role};
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/files")
-            // Public endpoints
             .route("/upload", web::post().to(upload_file))
             .route("/{file_id}", web::get().to(get_file_info))
             .route("/{file_id}/content", web::get().to(get_file_content))
@@ -25,7 +22,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/check", web::post().to(check_file_exists))
             .route("/banned", web::get().to(get_banned_hashes))
             
-            // Protected endpoints
             .service(
                 web::scope("")
                     .wrap(jwt_auth())

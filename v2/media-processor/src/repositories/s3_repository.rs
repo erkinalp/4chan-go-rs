@@ -1,13 +1,12 @@
 use aws_sdk_s3::{Client as S3Client, config::Credentials};
 use aws_config::meta::region::RegionProviderChain;
-use aws_config::BehaviorVersion;
+use aws_sdk_s3::presigning::PresigningConfig;
 use chrono::Utc;
 use std::io::Cursor;
 use uuid::Uuid;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// Repository for handling file storage in S3-compatible storage
 #[derive(Clone)]
 pub struct S3Repository {
     client: Arc<S3Client>,
@@ -15,19 +14,15 @@ pub struct S3Repository {
 }
 
 impl S3Repository {
-    /// Create a new S3 repository
     pub async fn new(
         endpoint: &str,
-        region: &str,
+        _region: &str,
         access_key: &str, 
         secret_key: &str,
         bucket: &str
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        // Set up region provider
-        let region_provider = RegionProviderChain::first_try(region.to_string())
-            .or_default_provider();
+        let region_provider = RegionProviderChain::default_provider();
             
-        // Set up credentials
         let credentials_provider = Credentials::new(
             access_key,
             secret_key,
@@ -36,8 +31,7 @@ impl S3Repository {
             "static-credentials"
         );
         
-        // Configure S3 client
-        let config = aws_config::defaults(BehaviorVersion::latest())
+        let config = aws_config::from_env()
             .region(region_provider)
             .endpoint_url(endpoint)
             .credentials_provider(credentials_provider)
@@ -51,31 +45,28 @@ impl S3Repository {
             bucket: bucket.to_string(),
         };
         
-        // Ensure bucket exists
         repo.ensure_bucket_exists().await?;
         
         Ok(repo)
     }
     
-    /// Ensure the bucket exists, create it if it doesn't
     async fn ensure_bucket_exists(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // Check if bucket exists
         let buckets = self.client.list_buckets().send().await?;
         
-        let bucket_exists = buckets.buckets()
-            .unwrap_or_default()
-            .iter()
-            .any(|bucket| bucket.name().unwrap_or_default() == self.bucket);
+        let bucket_exists = buckets.buckets().iter().any(|bucket| {
+            if let Some(name) = bucket.name() {
+                name == self.bucket
+            } else {
+                false
+            }
+        });
             
         if !bucket_exists {
-            // Create bucket
             self.client.create_bucket()
                 .bucket(&self.bucket)
                 .send()
                 .await?;
                 
-            // Set public read access (in a production system you'd be more careful with this)
-            // This is simplified for the example
             let policy = format!(r#"{{
                 "Version": "2012-10-17",
                 "Statement": [
@@ -98,54 +89,49 @@ impl S3Repository {
         Ok(())
     }
     
-    /// Upload a file to S3
     pub async fn upload_file(
         &self,
-        file_id: &Uuid,
+        _file_id: &Uuid,
         file_data: &[u8],
         filename: &str,
         content_type: &str
     ) -> Result<(String, String), Box<dyn std::error::Error>> {
-        // Create unique filename
         let timestamp = Utc::now().timestamp();
         let unique_filename = format!("{}_{}", timestamp, filename);
         
-        // Calculate MD5 (AWS SDK uses base64-encoded MD5 for etag)
-        let md5 = md5::compute(file_data);
-        let content_md5 = base64::encode(md5.as_ref());
+        let _md5 = md5::compute(file_data);
         
-        // Upload file
         self.client.put_object()
             .bucket(&self.bucket)
             .key(&unique_filename)
             .body(file_data.to_vec().into())
             .content_type(content_type)
-            .content_md5(content_md5)
-            .metadata("file-id", &file_id.to_string())
+            .metadata("file-id", &_file_id.to_string())
             .send()
             .await?;
             
-        // Generate URLs
-        // In a real app you'd use proper URL generation with signed URLs if needed
         let file_url = format!("https://{}.s3.amazonaws.com/{}", self.bucket, unique_filename);
         
-        // In a real app, you'd generate an actual thumbnail and upload it separately
-        // For this example, we'll just use the same URL
         let thumbnail_url = file_url.clone();
         
         Ok((file_url, thumbnail_url))
     }
     
-    /// Delete a file from S3
-    pub async fn delete_file(&self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-        // Delete object
+    pub async fn delete_file(&self, _file_id: &Uuid, filename: &Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+        let filename = match filename {
+            Some(name) => name,
+            None => return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Filename not found"
+            ))),
+        };
+        
         self.client.delete_object()
             .bucket(&self.bucket)
             .key(filename)
             .send()
             .await?;
             
-        // Also delete thumbnail if it exists
         let thumbnail_name = format!("thumb_{}", filename);
         let _ = self.client.delete_object()
             .bucket(&self.bucket)
@@ -156,34 +142,36 @@ impl S3Repository {
         Ok(())
     }
     
-    /// Get a file from S3
-    pub async fn get_file(&self, filename: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        // Get object
+    pub async fn get_file(&self, _file_id: &Uuid, filename: &Option<String>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let filename = match filename {
+            Some(name) => name,
+            None => return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Filename not found"
+            ))),
+        };
+        
         let response = self.client.get_object()
             .bucket(&self.bucket)
             .key(filename)
             .send()
             .await?;
             
-        // Read the body
         let data = response.body.collect().await?;
         let bytes = data.into_bytes();
         
         Ok(bytes.to_vec())
     }
     
-    /// Get a presigned URL for a file
     pub async fn get_presigned_url(
         &self,
         filename: &str,
         expiry_secs: u64
     ) -> Result<String, Box<dyn std::error::Error>> {
-        // Create presigner
-        let presigning_config = aws_sdk_s3::presigning::config::PresigningConfig::builder()
+        let presigning_config = PresigningConfig::builder()
             .expires_in(std::time::Duration::from_secs(expiry_secs))
             .build()?;
             
-        // Generate presigned URL
         let presigned_request = self.client.get_object()
             .bucket(&self.bucket)
             .key(filename)
@@ -191,5 +179,31 @@ impl S3Repository {
             .await?;
             
         Ok(presigned_request.uri().to_string())
+    }
+    
+    pub async fn get_thumbnail(
+        &self,
+        _file_id: &Uuid,
+        thumbnail_filename: &Option<String>,
+        _size: &str
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let filename = match thumbnail_filename {
+            Some(name) => name,
+            None => return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Thumbnail filename not found"
+            ))),
+        };
+        
+        let response = self.client.get_object()
+            .bucket(&self.bucket)
+            .key(filename)
+            .send()
+            .await?;
+            
+        let data = response.body.collect().await?;
+        let bytes = data.into_bytes();
+        
+        Ok(bytes.to_vec())
     }
 }

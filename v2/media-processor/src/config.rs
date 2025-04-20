@@ -14,6 +14,7 @@ pub struct Config {
     pub captcha: CaptchaConfig,
     pub cors: CorsConfig,
     pub rate_limit: RateLimitConfig,
+    pub files: FileConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -85,35 +86,33 @@ pub struct RateLimitConfig {
     pub ip_header: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct FileConfig {
+    pub max_size: u64,
+    pub allowed_types: String,
+    pub storage_path: String,
+}
+
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         // Load .env file if it exists
         dotenv::dotenv().ok();
 
-        // Set default configuration
-        let mut s = ConfigLib::default();
-        
-        // Read default configuration
-        s.merge(File::with_name("config/default")
-            .required(false))?;
-
-        // Read environment-specific config file if specified
         let env = env::var("RUN_ENV").unwrap_or_else(|_| "development".into());
-        s.merge(File::with_name(&format!("config/{}", env))
-            .required(false))?;
-
-        // Add in settings from environment variables (with a prefix of APP)
-        // E.g. APP_SERVER__PORT=8080 would set server.port
-        s.merge(Environment::with_prefix("app")
-            .separator("__"))?;
-
-        // Parse Neon database URL if using a standard URL format
-        if let Ok(database_url) = env::var("DATABASE_URL") {
-            s.set("database.connection_string", database_url)?;
+        let database_url = env::var("DATABASE_URL").ok();
+        
+        let mut builder = ConfigLib::builder()
+            .add_source(File::with_name("config/default").required(false))
+            .add_source(File::with_name(&format!("config/{}", env)).required(false))
+            .add_source(Environment::with_prefix("app").separator("__"));
+        
+        if let Some(url) = database_url {
+            builder = builder.set_override("database.connection_string", url)?;
         }
 
-        // Deserialize configuration
-        s.try_into()
+        // Build and deserialize configuration
+        let config = builder.build()?;
+        Ok(config.try_deserialize()?)
     }
 }
 
@@ -175,6 +174,11 @@ impl Default for Config {
                 burst_size: 20,
                 per_ip: true,
                 ip_header: "X-Real-IP".to_string(),
+            },
+            files: FileConfig {
+                max_size: 10485760, // 10MB
+                allowed_types: "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm".to_string(),
+                storage_path: "/tmp/uploads".to_string(),
             },
         }
     }

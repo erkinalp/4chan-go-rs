@@ -1,9 +1,10 @@
 use actix_web::{HttpResponse, ResponseError};
-use derive_more::{Display, Error};
+use derive_more::Display;
+use std::error::Error as StdError;
 use serde_json::json;
 use std::convert::From;
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Display)]
 pub enum AppError {
     #[display(fmt = "Bad Request: {}", _0)]
     BadRequest(String),
@@ -80,5 +81,11 @@ impl ResponseError for AppError {
                 }))
             },
         }
+    }
+}
+
+impl StdError for AppError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        None
     }
 }

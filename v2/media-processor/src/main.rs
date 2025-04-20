@@ -1,6 +1,6 @@
 use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpServer};
-use actix_web_prometheus::PrometheusMetricsBuilder;
+use actix_web::{middleware as actix_middleware, web, App, HttpServer};
+use actix_web_prom::PrometheusMetricsBuilder;
 use prometheus::Registry;
 use std::net::TcpListener;
 use tracing::{info, Level};
@@ -53,7 +53,6 @@ async fn main() -> std::io::Result<()> {
 
     // Create Redis client
     let redis_repo = RedisRepository::new(&config.redis.url)
-        .await
         .expect("Failed to create Redis client");
 
     // Create S3 client
@@ -68,12 +67,10 @@ async fn main() -> std::io::Result<()> {
     .expect("Failed to create S3 client");
 
     // Create a new registry for metrics
-    let registry = Registry::new();
     let prometheus = PrometheusMetricsBuilder::new("api")
-        .registry(registry)
         .endpoint("/metrics")
         .build()
-        .unwrap();
+        .expect("Failed to build prometheus metrics");
 
     // Start HTTP server
     let bind_address = format!("{}:{}", config.server.host, config.server.port);
@@ -95,9 +92,9 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(prometheus.clone())
-            .wrap(middleware::Logger::default())
-            .wrap(middleware::Compress::default())
-            .wrap(middleware::NormalizePath::trim())
+            .wrap(actix_middleware::Logger::default())
+            .wrap(actix_middleware::Compress::default())
+            .wrap(actix_middleware::NormalizePath::trim())
             .wrap(cors)
             .app_data(web::Data::new(app_config.clone()))
             .app_data(web::Data::new(postgres_repo))
