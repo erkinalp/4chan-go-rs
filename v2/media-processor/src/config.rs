@@ -14,6 +14,7 @@ pub struct Config {
     pub captcha: CaptchaConfig,
     pub cors: CorsConfig,
     pub rate_limit: RateLimitConfig,
+    pub files: FileConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -83,6 +84,13 @@ pub struct RateLimitConfig {
     pub burst_size: u32,
     pub per_ip: bool,
     pub ip_header: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FileConfig {
+    pub max_size: u64,
+    pub allowed_types: String,
+    pub storage_path: String,
 }
 
 impl Config {
@@ -166,6 +174,11 @@ impl Default for Config {
                 burst_size: 20,
                 per_ip: true,
                 ip_header: "X-Real-IP".to_string(),
+            },
+            files: FileConfig {
+                max_size: 10485760, // 10MB
+                allowed_types: "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm".to_string(),
+                storage_path: "/tmp/uploads".to_string(),
             },
         }
     }

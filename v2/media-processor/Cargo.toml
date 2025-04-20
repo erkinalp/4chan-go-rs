@@ -14,7 +14,7 @@ tokio-stream = "0.1.14"
 futures = "0.3.28"
 serde = { version = "1.0.171", features = ["derive"] }
 serde_json = "1.0.103"
-sqlx = { version = "0.8.1", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros"] }
+sqlx = { version = "0.8.1", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros", "chrono"] }
 deadpool-redis = { version = "0.13.0", features = ["serde"] }
 aws-sdk-s3 = "1.6.1"
 aws-config = "1.6.1"
@@ -33,8 +33,10 @@ actix-multipart = "0.6.1"
 image = "0.24.6"
 md5 = "0.7.0"
 sha2 = "0.10.7"
-actix-web-prometheus = "0.1.2"
-prometheus = { version = "0.13.3", features = ["process"] }
+actix-web-prom = { version = "0.9.0", default-features = false }
+prometheus = { version = "0.14.0", features = ["process"], default-features = false }
+base64 = "0.13.0"
+log = "0.4.20"
 derive_more = "0.99.17"
 sanitize_html = "0.7.0"
 thiserror = "1.0.44"

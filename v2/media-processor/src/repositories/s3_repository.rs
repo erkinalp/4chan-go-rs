@@ -16,7 +16,7 @@ pub struct S3Repository {
 impl S3Repository {
     pub async fn new(
         endpoint: &str,
-        region: &str,
+        _region: &str,
         access_key: &str, 
         secret_key: &str,
         bucket: &str
@@ -53,8 +53,7 @@ impl S3Repository {
     async fn ensure_bucket_exists(&self) -> Result<(), Box<dyn std::error::Error>> {
         let buckets = self.client.list_buckets().send().await?;
         
-        let bucket_list = buckets.buckets().unwrap_or_default();
-        let bucket_exists = bucket_list.iter().any(|bucket| {
+        let bucket_exists = buckets.buckets().iter().any(|bucket| {
             if let Some(name) = bucket.name() {
                 name == self.bucket
             } else {
@@ -92,7 +91,7 @@ impl S3Repository {
     
     pub async fn upload_file(
         &self,
-        file_id: &Uuid,
+        _file_id: &Uuid,
         file_data: &[u8],
         filename: &str,
         content_type: &str
@@ -107,7 +106,7 @@ impl S3Repository {
             .key(&unique_filename)
             .body(file_data.to_vec().into())
             .content_type(content_type)
-            .metadata("file-id", &file_id.to_string())
+            .metadata("file-id", &_file_id.to_string())
             .send()
             .await?;
             
@@ -118,7 +117,15 @@ impl S3Repository {
         Ok((file_url, thumbnail_url))
     }
     
-    pub async fn delete_file(&self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn delete_file(&self, _file_id: &Uuid, filename: &Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+        let filename = match filename {
+            Some(name) => name,
+            None => return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Filename not found"
+            ))),
+        };
+        
         self.client.delete_object()
             .bucket(&self.bucket)
             .key(filename)
@@ -135,7 +142,15 @@ impl S3Repository {
         Ok(())
     }
     
-    pub async fn get_file(&self, filename: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    pub async fn get_file(&self, _file_id: &Uuid, filename: &Option<String>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let filename = match filename {
+            Some(name) => name,
+            None => return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Filename not found"
+            ))),
+        };
+        
         let response = self.client.get_object()
             .bucket(&self.bucket)
             .key(filename)
@@ -164,5 +179,31 @@ impl S3Repository {
             .await?;
             
         Ok(presigned_request.uri().to_string())
+    }
+    
+    pub async fn get_thumbnail(
+        &self,
+        _file_id: &Uuid,
+        thumbnail_filename: &Option<String>,
+        _size: &str
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let filename = match thumbnail_filename {
+            Some(name) => name,
+            None => return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Thumbnail filename not found"
+            ))),
+        };
+        
+        let response = self.client.get_object()
+            .bucket(&self.bucket)
+            .key(filename)
+            .send()
+            .await?;
+            
+        let data = response.body.collect().await?;
+        let bytes = data.into_bytes();
+        
+        Ok(bytes.to_vec())
     }
 }
