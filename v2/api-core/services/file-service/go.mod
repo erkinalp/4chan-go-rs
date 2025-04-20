@@ -1,6 +1,6 @@
 module github.com/4chan/v2/backend_go
 
-go 1.23
+go 1.18
 
 require (
 	github.com/gin-gonic/gin v1.9.1
