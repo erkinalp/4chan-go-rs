@@ -16,9 +16,16 @@ resources:
 - postgres/pvc.yaml
 - redis/deployment.yaml
 - redis/service.yaml
+- redis/pvc.yaml
 - minio/deployment.yaml
 - minio/service.yaml
 - minio/pvc.yaml
+- monitoring/prometheus-deployment.yaml
+- monitoring/prometheus-service.yaml
+- monitoring/prometheus-pvc.yaml
+- monitoring/grafana-deployment.yaml
+- monitoring/grafana-service.yaml
+- monitoring/grafana-pvc.yaml
 - ingress.yaml
 
 commonLabels:
@@ -30,10 +37,43 @@ configMapGenerator:
   - API_PREFIX=api
   - API_VERSION=v1
   - CORS_ORIGINS=https://4chan-v2.example.com
+- name: prometheus-config
+  files:
+  - prometheus.yml=../../docker/prometheus/prometheus.yml
+  - alerts.yml=../../docker/prometheus/rules/alerts.yml
+- name: grafana-datasources
+  files:
+  - prometheus.yml=../../docker/grafana/provisioning/datasources/prometheus.yml
+- name: grafana-dashboards-config
+  files:
+  - dashboard.yml=../../docker/grafana/provisioning/dashboards/dashboard.yml
+- name: grafana-dashboards
+  files:
+  - 4chan-overview.json=../../docker/grafana/provisioning/dashboards/4chan-overview.json
+- name: redis-config
+  files:
+  - redis.conf=../../docker/redis/redis.conf
 
-secretsGenerator:
-- name: database-credentials
+secretGenerator:
+- name: database-secret
   literals:
-  - POSTGRES_USER=app_user
-  - POSTGRES_PASSWORD=change_me_in_production
-  - POSTGRES_DB=4chan
+  - username=postgres
+  - password=changeme
+  - connection-string=postgres://postgres:changeme@postgres-service:5432/4chan
+- name: jwt-secret
+  literals:
+  - secret=changeme_jwt_secret_32_chars_min
+  - refresh-secret=changeme_refresh_secret_32_chars_min
+- name: minio-secret
+  literals:
+  - root-user=minioadmin
+  - root-password=changeme
+  - access-key=minioadmin
+  - secret-key=changeme
+- name: grafana-secret
+  literals:
+  - admin-user=admin
+  - admin-password=changeme
+- name: redis-secret
+  literals:
+  - password=changeme

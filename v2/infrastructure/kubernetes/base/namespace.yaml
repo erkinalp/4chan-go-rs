@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: 4chan-v2
+  labels:
+    name: 4chan-v2
+    app: 4chan-modernization
