@@ -10,16 +10,17 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Environment string         `mapstructure:"ENVIRONMENT"`
-	LogLevel    string         `mapstructure:"LOG_LEVEL"`
-	Server      ServerConfig   `mapstructure:",squash"`
-	Database    DatabaseConfig `mapstructure:",squash"`
-	Redis       RedisConfig    `mapstructure:",squash"`
-	Minio       MinioConfig    `mapstructure:",squash"`
-	JWT         JWTConfig      `mapstructure:",squash"`
-	Captcha     CaptchaConfig  `mapstructure:",squash"`
-	CORS        CORSConfig     `mapstructure:",squash"`
-	RateLimit   RateLimitConfig `mapstructure:",squash"`
+	Environment   string               `mapstructure:"ENVIRONMENT"`
+	LogLevel      string               `mapstructure:"LOG_LEVEL"`
+	Server        ServerConfig         `mapstructure:",squash"`
+	Database      DatabaseConfig       `mapstructure:",squash"`
+	Redis         RedisConfig          `mapstructure:",squash"`
+	Minio         MinioConfig          `mapstructure:",squash"`
+	JWT           JWTConfig            `mapstructure:",squash"`
+	Captcha       CaptchaConfig        `mapstructure:",squash"`
+	CORS          CORSConfig           `mapstructure:",squash"`
+	RateLimit     RateLimitConfig      `mapstructure:",squash"`
+	MalwareScanner MalwareScannerConfig `mapstructure:",squash"`
 }
 
 // ServerConfig holds server related configuration
@@ -83,10 +84,17 @@ type CORSConfig struct {
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
-	Enabled          bool  `mapstructure:"RATE_LIMIT_ENABLED"`
-	Requests         int   `mapstructure:"RATE_LIMIT_REQUESTS"`
-	WindowSeconds    int   `mapstructure:"RATE_LIMIT_WINDOW_SECONDS"`
-	IPHeaderName     string `mapstructure:"RATE_LIMIT_IP_HEADER"`
+	Enabled       bool   `mapstructure:"RATE_LIMIT_ENABLED"`
+	Requests      int    `mapstructure:"RATE_LIMIT_REQUESTS"`
+	WindowSeconds int    `mapstructure:"RATE_LIMIT_WINDOW_SECONDS"`
+	IPHeaderName  string `mapstructure:"RATE_LIMIT_IP_HEADER"`
+}
+
+type MalwareScannerConfig struct {
+	Enabled  bool   `mapstructure:"MALWARE_SCANNER_ENABLED"`
+	FailOpen bool   `mapstructure:"MALWARE_SCANNER_FAIL_OPEN"`
+	Host     string `mapstructure:"CLAMAV_HOST"`
+	Port     int    `mapstructure:"CLAMAV_PORT"`
 }
 
 // Load reads configuration from files and environment variables
@@ -119,6 +127,10 @@ func Load() (*Config, error) {
 	viper.SetDefault("RATE_LIMIT_REQUESTS", 100)
 	viper.SetDefault("RATE_LIMIT_WINDOW_SECONDS", 60)
 	viper.SetDefault("RATE_LIMIT_IP_HEADER", "X-Real-IP")
+	viper.SetDefault("MALWARE_SCANNER_ENABLED", true)
+	viper.SetDefault("MALWARE_SCANNER_FAIL_OPEN", false)
+	viper.SetDefault("CLAMAV_HOST", "clamav")
+	viper.SetDefault("CLAMAV_PORT", 3310)
 
 	// Read configuration from environment variables
 	viper.AutomaticEnv()

@@ -7,6 +7,8 @@ import (
 	"github.com/4chan/v2/backend_go/internal/api/handlers"
 	"github.com/4chan/v2/backend_go/internal/api/middleware"
 	"github.com/4chan/v2/backend_go/internal/database"
+	"github.com/4chan/v2/backend_go/internal/repository"
+	"github.com/4chan/v2/backend_go/internal/services"
 	"github.com/4chan/v2/backend_go/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
@@ -42,7 +44,9 @@ func NewRouter(
 	boardHandler := handlers.NewBoardHandler(db, redis)
 	threadHandler := handlers.NewThreadHandler(db, redis)
 	postHandler := handlers.NewPostHandler(db, redis, fileStorage)
-	fileHandler := handlers.NewFileHandler(fileStorage)
+	fileRepo := repository.NewFileRepository(db)
+	malwareScanner := services.NewClamAVScanner(cfg.MalwareScanner)
+	fileHandler := handlers.NewFileHandler(fileStorage, fileRepo, malwareScanner)
 	captchaHandler := handlers.NewCaptchaHandler(redis, cfg.Captcha)
 	moderationHandler := handlers.NewModerationHandler(db, redis)
 

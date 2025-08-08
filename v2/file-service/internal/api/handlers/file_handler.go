@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"github.com/4chan/v2/backend_go/internal/api/models"
 	"github.com/4chan/v2/backend_go/internal/repository"
 	"github.com/4chan/v2/backend_go/internal/storage"
+	"github.com/4chan/v2/backend_go/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/h2non/filetype"
@@ -26,12 +28,14 @@ import (
 type FileHandler struct {
 	storage  *storage.MinioClient
 	fileRepo *repository.FileRepository
+	scanner  services.MalwareScanner
 }
 
-func NewFileHandler(storage *storage.MinioClient, fileRepo *repository.FileRepository) *FileHandler {
+func NewFileHandler(storage *storage.MinioClient, fileRepo *repository.FileRepository, scanner services.MalwareScanner) *FileHandler {
 	return &FileHandler{
 		storage:  storage,
 		fileRepo: fileRepo,
+		scanner:  scanner,
 	}
 }
 
@@ -86,6 +90,15 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	if kind.MIME.Type == "application" && (kind == matchers.TypeExe || kind == matchers.TypeElf) {
+		c.JSON(http.StatusUnsupportedMediaType, models.Error{
+			StatusCode: http.StatusUnsupportedMediaType,
+			Message:    "Executable files are not allowed",
+			Error:      "Detected executable/binary format",
+		})
+		return
+	}
+
 	if !isAllowedFileType(kind) {
 		c.JSON(http.StatusUnsupportedMediaType, models.Error{
 			StatusCode: http.StatusUnsupportedMediaType,
@@ -95,8 +108,40 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if !extMatchesMime(ext, kind.MIME.Value) {
+		c.JSON(http.StatusUnsupportedMediaType, models.Error{
+			StatusCode: http.StatusUnsupportedMediaType,
+			Message:    "File extension does not match content type",
+			Error:      fmt.Sprintf("Extension %s does not match MIME %s", ext, kind.MIME.Value),
+		})
+		return
+	}
+
+	if h.scanner != nil {
+		clean, reason, scanErr := h.scanner.Scan(c.Request.Context(), fileData)
+		if scanErr != nil {
+			c.JSON(http.StatusServiceUnavailable, models.Error{
+				StatusCode: http.StatusServiceUnavailable,
+				Message:    "Malware scanner unavailable",
+				Error:      scanErr.Error(),
+			})
+			return
+		}
+		if !clean {
+			c.JSON(http.StatusUnprocessableEntity, models.Error{
+				StatusCode: http.StatusUnprocessableEntity,
+				Message:    "Malicious content detected",
+				Error:      reason,
+			})
+			return
+		}
+	}
+
 	hash := md5.Sum(fileData)
 	md5Hash := hex.EncodeToString(hash[:])
+	sha := sha256.Sum256(fileData)
+	sha256Hash := hex.EncodeToString(sha[:])
 
 	existingFile, err := h.fileRepo.GetFileByMD5Hash(c.Request.Context(), md5Hash)
 	if err != nil {
@@ -167,7 +212,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		ThumbnailFilename: filepath.Base(thumbnailURL),
 		MimeType:          kind.MIME.Value,
 		MD5Hash:           md5Hash,
-		SHA256Hash:        "", // TODO: Calculate SHA256 hash
+		SHA256Hash:        sha256Hash,
 		IsSpoilered:       spoiler,
 		CreatedAt:         time.Now(),
 	}
@@ -528,4 +573,31 @@ func isImage(kind filetype.Type) bool {
 
 func getImageDimensions(fileData []byte) (width, height int, err error) {
 	return 800, 600, nil
+}
+func extMatchesMime(ext string, mime string) bool {
+	if ext == "" {
+		return false
+	}
+	switch mime {
+	case "image/jpeg":
+		return ext == ".jpg" || ext == ".jpeg"
+	case "image/png":
+		return ext == ".png"
+	case "image/gif":
+		return ext == ".gif"
+	case "image/webp":
+		return ext == ".webp"
+	case "video/mp4":
+		return ext == ".mp4"
+	case "video/webm":
+		return ext == ".webm"
+	case "application/pdf":
+		return ext == ".pdf"
+	case "application/zip":
+		return ext == ".zip"
+	case "application/x-7z-compressed":
+		return ext == ".7z"
+	default:
+		return false
+	}
 }
