@@ -7,8 +7,8 @@ use image::{GenericImageView, ImageFormat};
 use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
-
-
+use std::path::Path;
+use sha2::{Digest, Sha256};
 use crate::config::Config;
 use crate::models::file::{
     File, 
@@ -23,12 +23,44 @@ use crate::models::file::{
 use crate::repositories::s3_repository::S3Repository;
 use crate::repositories::file_repository::FileRepository;
 use crate::utils;
+use crate::services::malware_scanner::ClamAVScanner;
+fn ext_matches_mime(ext: &str, mime: &str) -> bool {
+    match mime {
+        "image/jpeg" => matches!(ext, ".jpg" | ".jpeg"),
+        "image/png" => ext == ".png",
+        "image/gif" => ext == ".gif",
+        "image/webp" => ext == ".webp",
+        "video/mp4" => ext == ".mp4",
+        "video/webm" => ext == ".webm",
+        "application/pdf" => ext == ".pdf",
+        "application/zip" => ext == ".zip",
+        "application/x-7z-compressed" => ext == ".7z",
+        _ => false,
+    }
+}
+fn is_allowed_mime(mime: &str) -> bool {
+    matches!(
+        mime,
+        "image/jpeg" | "image/png" | "image/gif" | "image/webp" |
+        "video/mp4" | "video/webm" | "application/pdf" |
+        "application/zip" | "application/x-7z-compressed"
+    )
+}
+fn looks_executable(mime: &str) -> bool {
+    mime.starts_with("application/x-executable")
+        || mime == "application/x-dosexec"
+        || mime == "application/x-mach-binary"
+        || mime == "application/x-sharedlib"
+}
+
+
 
 pub async fn upload_file(
     multipart: Multipart,
     s3_repo: web::Data<S3Repository>,
     file_repo: web::Data<FileRepository>,
-    config: web::Data<Config>
+    config: web::Data<Config>,
+    scanner: web::Data<ClamAVScanner>
 ) -> Result<HttpResponse, Error> {
     let start_time = Instant::now();
     let mut file_data = Vec::new();
@@ -79,7 +111,35 @@ pub async fn upload_file(
     if file_data.is_empty() {
         return Err(error::ErrorBadRequest("No file data provided"));
     }
-    
+
+    if !is_allowed_mime(&content_type) {
+        return Err(error::ErrorBadRequest("Unsupported file type"));
+    }
+
+    let ext = Path::new(&filename)
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| format!(".{}", s.to_lowercase()))
+        .unwrap_or_default();
+
+    if !ext_matches_mime(&ext, &content_type) {
+        return Err(error::ErrorBadRequest("File extension does not match MIME"));
+    }
+
+    if looks_executable(&content_type) {
+        return Err(error::ErrorBadRequest("Executable files are not allowed"));
+    }
+
+    let sha256_hash = {
+        let mut hasher = Sha256::new();
+        hasher.update(&file_data);
+        format!("{:x}", hasher.finalize())
+    };
+
+    if scanner.get_ref().scan_bytes(&file_data).await.map_err(|e| error::ErrorInternalServerError(format!("Scanner error: {}", e)))? {
+        return Err(error::ErrorBadRequest("Malicious content detected"));
+    }
+
     if file_data.len() > config.files.max_size as usize {
         return Err(error::ErrorBadRequest(format!(
             "File too large. Maximum size is {} bytes",
@@ -143,7 +203,7 @@ pub async fn upload_file(
         thumbnail_filename: Some(thumbnail_url.clone()),
         mime_type: content_type.clone(),
         md5_hash: md5_hash.clone(),
-        sha256_hash: Some("".to_string()), // TODO: Calculate SHA256 hash
+        sha256_hash: Some(sha256_hash.clone()),
         is_spoilered: is_spoiler,
         created_at: Utc::now(),
         post_id: None,
