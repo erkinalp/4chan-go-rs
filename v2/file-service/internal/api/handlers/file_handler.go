@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"bytes"
-	"context"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,12 +15,13 @@ import (
 
 	"github.com/4chan/v2/backend_go/internal/api/models"
 	"github.com/4chan/v2/backend_go/internal/repository"
-	"github.com/4chan/v2/backend_go/internal/storage"
 	"github.com/4chan/v2/backend_go/internal/services"
+	"github.com/4chan/v2/backend_go/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
+	"github.com/h2non/filetype/types"
 )
 
 type FileHandler struct {
@@ -187,7 +186,6 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	fileID := uuid.New().String()
 
 	timestamp := time.Now().Unix()
-	ext := filepath.Ext(header.Filename)
 	uniqueFileName := fmt.Sprintf("%d_%s%s", timestamp, fileID, ext)
 
 	uploadInfo, err := h.storage.UploadFile(c.Request.Context(), fileData, uniqueFileName, kind.MIME.Value)
@@ -202,7 +200,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	thumbnailURL := uploadInfo.ThumbnailURL
 
-	file := &models.File{
+	dbFile := &models.File{
 		ID:                fileID,
 		Filename:          header.Filename,
 		StoredFilename:    uniqueFileName,
@@ -217,7 +215,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		CreatedAt:         time.Now(),
 	}
 
-	if err := h.fileRepo.CreateFile(c.Request.Context(), file); err != nil {
+	if err := h.fileRepo.CreateFile(c.Request.Context(), dbFile); err != nil {
 		c.JSON(http.StatusInternalServerError, models.Error{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to save file metadata",
@@ -551,7 +549,7 @@ func readFile(file multipart.File, size int64) ([]byte, error) {
 	return buffer, nil
 }
 
-func isAllowedFileType(kind filetype.Type) bool {
+func isAllowedFileType(kind types.Type) bool {
 	allowedTypes := map[string]bool{
 		"image/jpeg":             true,
 		"image/png":              true,
@@ -567,7 +565,7 @@ func isAllowedFileType(kind filetype.Type) bool {
 	return allowedTypes[kind.MIME.Value]
 }
 
-func isImage(kind filetype.Type) bool {
+func isImage(kind types.Type) bool {
 	return kind.MIME.Type == "image"
 }
 
