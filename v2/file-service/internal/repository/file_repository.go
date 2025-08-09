@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/4chan/v2/backend_go/internal/api/models"
-	"github.com/4chan/v2/backend_go/internal/database"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/models"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/database"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )

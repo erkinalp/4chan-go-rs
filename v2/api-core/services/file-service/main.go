@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/4chan/v2/backend_go/config"
-	"github.com/4chan/v2/backend_go/internal/api"
-	"github.com/4chan/v2/backend_go/internal/storage"
-	"github.com/4chan/v2/backend_go/internal/database"
-	"github.com/4chan/v2/backend_go/internal/logger"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/config"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/internal/api"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/internal/storage"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/internal/database"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 

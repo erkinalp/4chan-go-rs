@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/4chan/v2/backend_go/config"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
 	"github.com/redis/go-redis/v9"
 )
 

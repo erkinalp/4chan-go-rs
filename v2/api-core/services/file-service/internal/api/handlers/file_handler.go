@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/4chan/v2/backend_go/internal/api/models"
-	"github.com/4chan/v2/backend_go/internal/storage"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/internal/api/models"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"

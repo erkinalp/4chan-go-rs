@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/4chan/v2/backend_go/config"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"

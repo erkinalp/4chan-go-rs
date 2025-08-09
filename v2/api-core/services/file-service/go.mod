@@ -1,4 +1,4 @@
-module github.com/4chan/v2/backend_go
+module github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service
 
 go 1.18
 
