@@ -17,6 +17,7 @@ mod services;
 mod utils;
 mod error;
 
+use services::malware_scanner::{ClamAVScanner, MalwareScannerConfig as ScannerCfg};
 use config::Config;
 use repositories::{
     postgres_repository::PostgresRepository, 
@@ -72,11 +73,19 @@ async fn main() -> std::io::Result<()> {
         .build()
         .expect("Failed to build prometheus metrics");
 
+    let scanner = ClamAVScanner::new(ScannerCfg {
+        enabled: config.malware_scanner.enabled,
+        host: config.malware_scanner.host.clone(),
+        port: config.malware_scanner.port,
+        timeout_ms: config.malware_scanner.timeout_ms,
+    });
+
     // Start HTTP server
     let bind_address = format!("{}:{}", config.server.host, config.server.port);
     let listener = TcpListener::bind(&bind_address)?;
 
     HttpServer::new(move || {
+        let scanner = scanner.clone();
         // Configure CORS
         let cors = Cors::default()
             .allowed_origin(&config.cors.allowed_origins)
@@ -96,6 +105,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_middleware::Compress::default())
             .wrap(actix_middleware::NormalizePath::trim())
             .wrap(cors)
+            .app_data(web::Data::new(scanner))
             .app_data(web::Data::new(app_config.clone()))
             .app_data(web::Data::new(postgres_repo))
             .app_data(web::Data::new(redis_repo))

@@ -13,6 +13,8 @@ pub struct Config {
     pub jwt: JwtConfig,
     pub captcha: CaptchaConfig,
     pub cors: CorsConfig,
+    pub malware_scanner: MalwareScanner,
+
     pub rate_limit: RateLimitConfig,
     pub files: FileConfig,
 }
@@ -87,6 +89,15 @@ pub struct RateLimitConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct MalwareScanner {
+    pub enabled: bool,
+    pub host: String,
+    pub port: u16,
+    pub timeout_ms: u64,
+}
+
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct FileConfig {
     pub max_size: u64,
     pub allowed_types: String,
@@ -158,6 +169,7 @@ impl Default for Config {
                 refresh_expiration_days: 7,
                 issuer: "4chan-v2".to_string(),
             },
+
             captcha: CaptchaConfig {
                 secret_key: "secret".to_string(),
                 site_key: "site_key".to_string(),
@@ -169,6 +181,12 @@ impl Default for Config {
                 allowed_headers: "Authorization,Content-Type".to_string(),
                 max_age: 86400,
             },
+            malware_scanner: MalwareScanner {
+                enabled: true,
+                host: env::var("CLAMAV_HOST").unwrap_or_else(|_| "clamav".to_string()),
+                port: env::var("CLAMAV_PORT").ok().and_then(|v| v.parse().ok()).unwrap_or(3310),
+                timeout_ms: env::var("CLAMAV_TIMEOUT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(5000),
+            },
             rate_limit: RateLimitConfig {
                 enabled: true,
                 requests_per_second: 10,
@@ -177,7 +195,7 @@ impl Default for Config {
                 ip_header: "X-Real-IP".to_string(),
             },
             files: FileConfig {
-                max_size: 10485760, // 10MB
+                max_size: 10485760,
                 allowed_types: "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm".to_string(),
                 storage_path: "/tmp/uploads".to_string(),
             },

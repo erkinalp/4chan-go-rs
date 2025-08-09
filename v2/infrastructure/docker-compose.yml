@@ -183,6 +183,23 @@ services:
       timeout: 20s
       retries: 3
     restart: unless-stopped
+  # ClamAV
+  clamav:
+    image: clamav/clamav:stable
+    container_name: 4chan_clamav
+    ports:
+      - "3310:3310"
+    environment:
+      - CLAMAV_NO_FRESHCLAMD=false
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 3310"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
 
   # Prometheus (M�tricas)
   prometheus:
