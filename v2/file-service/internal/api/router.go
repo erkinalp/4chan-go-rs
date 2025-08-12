@@ -1,13 +1,13 @@
 package api
 
 import (
-	"github.com/4chan/v2/backend_go/config"
-	"github.com/4chan/v2/backend_go/internal/api/handlers"
-	"github.com/4chan/v2/backend_go/internal/api/middleware"
-	"github.com/4chan/v2/backend_go/internal/database"
-	"github.com/4chan/v2/backend_go/internal/repository"
-	"github.com/4chan/v2/backend_go/internal/services"
-	"github.com/4chan/v2/backend_go/internal/storage"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/handlers"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/middleware"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/database"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/repository"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/services"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/storage"
 	"github.com/gin-gonic/gin"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	files "github.com/swaggo/files"

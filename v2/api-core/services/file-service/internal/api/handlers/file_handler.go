@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"bytes"
-	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
@@ -11,14 +9,13 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/4chan/v2/backend_go/internal/api/models"
-	"github.com/4chan/v2/backend_go/internal/storage"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/internal/api/models"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
-	"github.com/h2non/filetype/matchers"
+	"github.com/h2non/filetype/types"
 	"github.com/google/uuid"
 )
 
@@ -270,12 +267,6 @@ func (h *FileHandler) GetFileContent(c *gin.Context) {
 		return
 	}
 
-	// Check download parameter
-	download := false
-	downloadStr := c.Query("download")
-	if downloadStr != "" {
-		download, _ = strconv.ParseBool(downloadStr)
-	}
 
 	// In a real application, you would look up the file in your database
 	// Then retrieve it from storage
@@ -472,7 +463,7 @@ func readFile(file multipart.File, size int64) ([]byte, error) {
 }
 
 // Helper function to check if file type is allowed
-func isAllowedFileType(kind filetype.Type) bool {
+func isAllowedFileType(kind types.Type) bool {
 	// List of allowed MIME types
 	allowedTypes := map[string]bool{
 		"image/jpeg":             true,
@@ -490,7 +481,7 @@ func isAllowedFileType(kind filetype.Type) bool {
 }
 
 // Helper function to check if file is an image
-func isImage(kind filetype.Type) bool {
+func isImage(kind types.Type) bool {
 	return kind.MIME.Type == "image"
 }
 

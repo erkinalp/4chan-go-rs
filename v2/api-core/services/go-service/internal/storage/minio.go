@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/4chan/v2/backend_go/config"
+	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/go-service/config"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
