@@ -51,7 +51,12 @@ async function bootstrap() {
       .setTitle('4chan API')
       .setDescription('API moderna para 4chan')
       .setVersion(apiVersion)
-      .addBearerAuth()
+      .addBearerAuth({
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'GNAP',
+        description: 'GNAP Access Token',
+      }, 'GNAP')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
@@ -61,11 +66,11 @@ async function bootstrap() {
   await app.listen(port);
   Logger.log(`Servidor corriendo en: http://localhost:${port}/${apiPrefix}/${apiVersion}`);
   if (isDevelopment) {
-    Logger.log(`Documentación Swagger disponible en: http://localhost:${port}/${swaggerPath}`);
+    Logger.log(`Documentaciï¿½n Swagger disponible en: http://localhost:${port}/${swaggerPath}`);
   }
 }
 
 bootstrap().catch((err) => {
-  Logger.error(`Error al iniciar la aplicación: ${err.message}`, err.stack);
+  Logger.error(`Error al iniciar la aplicaciï¿½n: ${err.message}`, err.stack);
   process.exit(1);
 });

@@ -60,10 +60,10 @@ paths:
                     type: number
                     example: 1234567
 
-  /auth/register:
+  /auth/grant:
     post:
-      summary: Registrar nuevo usuario
-      description: Crea una nueva cuenta de usuario (solo para administradores/moderadores)
+      summary: Solicitar autorización GNAP
+      description: Inicia el flujo de autorización GNAP para obtener tokens de acceso
       tags:
         - auth
       requestBody:
@@ -71,69 +71,60 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserRegistration'
-      responses:
-        '201':
-          description: Usuario creado exitosamente
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '409':
-          description: Usuario ya existe
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /auth/login:
-    post:
-      summary: Iniciar sesión
-      description: Autenticar un usuario y obtener tokens de acceso
-      tags:
-        - auth
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserLogin'
+              $ref: '#/components/schemas/GNAPGrantRequest'
       responses:
         '200':
-          description: Autenticación exitosa
+          description: Solicitud de autorización procesada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: '#/components/schemas/GNAPGrantResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
-  /auth/refresh:
+  /auth/continue:
     post:
-      summary: Refrescar token
-      description: Obtener un nuevo token de acceso usando el token de refresco
+      summary: Continuar autorización GNAP
+      description: Continúa el flujo de autorización GNAP después de la interacción del usuario
       tags:
         - auth
+      security:
+        - GNAPAuth: []
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               type: object
-              required:
-                - refreshToken
               properties:
-                refreshToken:
+                interact_ref:
                   type: string
+                  description: Referencia de interacción del usuario
       responses:
         '200':
-          description: Token refrescado exitosamente
+          description: Continuación de autorización procesada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/GNAPGrantResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/introspect:
+    post:
+      summary: Introspección de token GNAP
+      description: Valida y obtiene información sobre un token de acceso GNAP
+      tags:
+        - auth
+      security:
+        - GNAPAuth: []
+      responses:
+        '200':
+          description: Token válido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GNAPUserContext'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -423,11 +414,11 @@ paths:
 
 components:
   securitySchemes:
-    BearerAuth:
+    GNAPAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
-      description: Token JWT de autenticación
+      bearerFormat: GNAP
+      description: GNAP Access Token de autenticación
 
   parameters:
     QueryLimit:
@@ -592,32 +583,206 @@ components:
           format: password
           example: StrongPassword123!
 
-    AuthResponse:
+    GNAPGrantRequest:
       type: object
       required:
-        - accessToken
-        - refreshToken
-        - user
+        - access_token
+        - client
       properties:
-        accessToken:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        refreshToken:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        access_token:
+          type: object
+          required:
+            - access
+          properties:
+            access:
+              type: array
+              items:
+                $ref: '#/components/schemas/GNAPAccessRight'
+        client:
+          $ref: '#/components/schemas/GNAPClientInstance'
         user:
           type: object
           properties:
-            id:
+            sub_ids:
+              type: array
+              items:
+                $ref: '#/components/schemas/GNAPSubjectID'
+        interact:
+          type: object
+          properties:
+            start:
+              type: array
+              items:
+                type: string
+                enum: [redirect, app, user_code]
+            finish:
+              type: object
+              properties:
+                method:
+                  type: string
+                  enum: [redirect, push]
+                uri:
+                  type: string
+                  format: uri
+                nonce:
+                  type: string
+
+    GNAPGrantResponse:
+      type: object
+      properties:
+        continue:
+          type: object
+          properties:
+            access_token:
+              type: object
+              properties:
+                value:
+                  type: string
+            uri:
               type: string
-              example: 123e4567-e89b-12d3-a456-426614174000
-            username:
+              format: uri
+            wait:
+              type: integer
+        access_token:
+          $ref: '#/components/schemas/GNAPAccessToken'
+        interact:
+          type: object
+          properties:
+            redirect:
               type: string
-              example: moderator1
-            role:
+              format: uri
+            app:
               type: string
-              enum: [USER, JANITOR, MODERATOR, ADMIN]
-              example: MODERATOR
+              format: uri
+            user_code:
+              type: string
+            user_code_uri:
+              type: string
+              format: uri
+            finish:
+              type: string
+        subject:
+          type: object
+          properties:
+            sub_ids:
+              type: array
+              items:
+                $ref: '#/components/schemas/GNAPSubjectID'
+            assertions:
+              type: object
+        instance_id:
+          type: string
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            description:
+              type: string
+
+    GNAPAccessToken:
+      type: object
+      required:
+        - value
+        - access
+      properties:
+        value:
+          type: string
+          example: OS9M2PMHKUR64TB8N6BW7OZB8CDFONP219RP1LT0
+        label:
+          type: string
+        manage:
+          type: string
+          format: uri
+        access:
+          type: array
+          items:
+            $ref: '#/components/schemas/GNAPAccessRight'
+        expires_in:
+          type: integer
+        key:
+          type: object
+
+    GNAPAccessRight:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          example: api
+        actions:
+          type: array
+          items:
+            type: string
+          example: [read, write]
+        locations:
+          type: array
+          items:
+            type: string
+        datatypes:
+          type: array
+          items:
+            type: string
+
+    GNAPClientInstance:
+      type: object
+      required:
+        - key
+      properties:
+        key:
+          type: object
+          required:
+            - proof
+          properties:
+            proof:
+              type: string
+              enum: [httpsig, mtls, jwsd, dpop]
+              example: httpsig
+            jwk:
+              type: object
+        class_id:
+          type: string
+        display:
+          type: object
+          properties:
+            name:
+              type: string
+              example: 4chan v2 Web Client
+            uri:
+              type: string
+              format: uri
+
+    GNAPSubjectID:
+      type: object
+      required:
+        - subject_type
+      properties:
+        subject_type:
+          type: string
+          example: email
+        email:
+          type: string
+          format: email
+
+    GNAPUserContext:
+      type: object
+      required:
+        - sub
+      properties:
+        sub:
+          type: string
+          example: user123
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [USER, JANITOR, MODERATOR, ADMIN]
+        permissions:
+          type: array
+          items:
+            type: string
 
     Board:
       type: object

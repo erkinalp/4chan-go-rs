@@ -84,12 +84,12 @@ type GNAPFinish struct {
 }
 
 type GNAPGrantResponse struct {
-	Continue    *GNAPContinue         `json:"continue,omitempty"`
-	AccessToken *GNAPAccessToken      `json:"access_token,omitempty"`
+	Continue    *GNAPContinue   `json:"continue,omitempty"`
+	AccessToken *GNAPAccessToken `json:"access_token,omitempty"`
 	Interact    *GNAPInteractResponse `json:"interact,omitempty"`
-	Subject     *GNAPSubject          `json:"subject,omitempty"`
-	InstanceID  string                `json:"instance_id,omitempty"`
-	Error       *GNAPError            `json:"error,omitempty"`
+	Subject     *GNAPSubject    `json:"subject,omitempty"`
+	InstanceID  string          `json:"instance_id,omitempty"`
+	Error       *GNAPError      `json:"error,omitempty"`
 }
 
 type GNAPContinue struct {
@@ -194,28 +194,37 @@ func (c *GNAPClient) ValidateToken(ctx context.Context, token string) (*UserCont
 	return &userCtx, nil
 }
 
-func ExtractUserFromGNAP(c *gin.Context, gnapClient *GNAPClient) (string, time.Time, error) {
-	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" {
-		return "", time.Time{}, fmt.Errorf("no authorization header")
-	}
-
-	tokenParts := strings.Split(authHeader, " ")
-	if len(tokenParts) != 2 || tokenParts[0] != "GNAP" {
-		return "", time.Time{}, fmt.Errorf("invalid authorization format")
-	}
-
-	token := tokenParts[1]
-	userCtx, err := gnapClient.ValidateToken(c.Request.Context(), token)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-
-	return userCtx.Sub, time.Now(), nil
-}
-
 func generateNonce() string {
 	bytes := make([]byte, 32)
 	rand.Read(bytes)
 	return base64.URLEncoding.EncodeToString(bytes)
+}
+
+func GNAPAuthMiddleware(gnapClient *GNAPClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			c.Abort()
+			return
+		}
+
+		tokenParts := strings.Split(authHeader, " ")
+		if len(tokenParts) != 2 || tokenParts[0] != "GNAP" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
+			c.Abort()
+			return
+		}
+
+		token := tokenParts[1]
+		userCtx, err := gnapClient.ValidateToken(c.Request.Context(), token)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.Abort()
+			return
+		}
+
+		c.Set("user", userCtx)
+		c.Next()
+	}
 }

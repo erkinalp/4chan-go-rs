@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/go-service/config"
 	"github.com/erkinalp/4chan-go-rs/v2/api-core/services/go-service/internal/database"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/auth"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -52,14 +53,14 @@ type UserClaims struct {
 	jwt.RegisteredClaims
 }
 
-func RateLimiter(redis *database.RedisClient, cfg config.RateLimitConfig) gin.HandlerFunc {
+func RateLimiter(redis *database.RedisClient, cfg config.RateLimitConfig, gnapClient *auth.GNAPClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !cfg.Enabled {
 			c.Next()
 			return
 		}
 
-		userID, createdAt, err := extractUserFromJWT(c, cfg)
+		userID, createdAt, err := extractUserFromGNAP(c, gnapClient)
 
 		var blocked bool
 		if err == nil && userID != "" {
@@ -76,34 +77,24 @@ func RateLimiter(redis *database.RedisClient, cfg config.RateLimitConfig) gin.Ha
 	}
 }
 
-func extractUserFromJWT(c *gin.Context, cfg config.RateLimitConfig) (string, time.Time, error) {
+func extractUserFromGNAP(c *gin.Context, gnapClient *auth.GNAPClient) (string, time.Time, error) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
 		return "", time.Time{}, errors.New("no authorization header")
 	}
 
-	if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
-		return "", time.Time{}, errors.New("invalid authorization header format")
+	tokenParts := strings.Split(authHeader, " ")
+	if len(tokenParts) != 2 || tokenParts[0] != "GNAP" {
+		return "", time.Time{}, errors.New("invalid authorization format")
 	}
 
-	tokenString := authHeader[7:]
-	
-	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return []byte("default_secret"), nil
-	})
-
+	token := tokenParts[1]
+	userCtx, err := gnapClient.ValidateToken(c.Request.Context(), token)
 	if err != nil {
 		return "", time.Time{}, err
 	}
 
-	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
-		return claims.UserID, claims.CreatedAt, nil
-	}
-
-	return "", time.Time{}, errors.New("invalid token claims")
+	return userCtx.Sub, time.Now(), nil
 }
 
 func checkUserRateLimit(c *gin.Context, redis *database.RedisClient, cfg config.RateLimitConfig, userID string, createdAt time.Time) bool {
@@ -241,7 +232,7 @@ func max(a, b int) int {
 	return b
 }
 
-func JWTAuth(cfg config.JWTConfig) gin.HandlerFunc {
+func GNAPAuth(gnapClient *auth.GNAPClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -253,7 +244,8 @@ func JWTAuth(cfg config.JWTConfig) gin.HandlerFunc {
 			return
 		}
 
-		if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
+		tokenParts := strings.Split(authHeader, " ")
+		if len(tokenParts) != 2 || tokenParts[0] != "GNAP" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Unauthorized",
 				"message": "Invalid authorization header format",
@@ -262,37 +254,21 @@ func JWTAuth(cfg config.JWTConfig) gin.HandlerFunc {
 			return
 		}
 
-		tokenString := authHeader[7:]
-		
-		token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("unexpected signing method")
-			}
-			return []byte(cfg.SecretKey), nil
-		})
-
+		token := tokenParts[1]
+		userCtx, err := gnapClient.ValidateToken(c.Request.Context(), token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Unauthorized",
-				"message": "Invalid JWT token",
+				"message": "Invalid GNAP token",
 			})
 			c.Abort()
 			return
 		}
 
-		if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
-			c.Set("user_id", claims.UserID)
-			c.Set("user_role", claims.Role)
-			c.Set("user_created_at", claims.CreatedAt)
-		} else {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Unauthorized",
-				"message": "Invalid token claims",
-			})
-			c.Abort()
-			return
-		}
-
+		c.Set("user_id", userCtx.Sub)
+		c.Set("user_role", userCtx.Role)
+		c.Set("user_email", userCtx.Email)
+		c.Set("user_permissions", userCtx.Permissions)
 		c.Next()
 	}
 }
