@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # API Gateway
   nginx:
-    image: nginx:alpine
+    image: openresty/openresty:alpine
     container_name: 4chan_nginx
     ports:
       - "80:80"
@@ -12,6 +12,7 @@ services:
       - ./docker/nginx/conf.d:/etc/nginx/conf.d
       - ./docker/nginx/ssl:/etc/nginx/ssl
       - ./docker/nginx/logs:/var/log/nginx
+      - ./docker/nginx/lua:/usr/local/openresty/nginx/lua
     environment:
       - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
     depends_on:

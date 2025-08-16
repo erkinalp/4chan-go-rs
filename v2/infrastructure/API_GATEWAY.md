@@ -16,12 +16,18 @@ The API Gateway is implemented using nginx and provides centralized routing, aut
 
 ### Rate Limiting
 
-The gateway implements multiple rate limiting zones:
+The gateway implements a custom fixed-window rate limiter with aggressive blocking behavior:
 
-- **Global Limit**: 50 requests/second per IP
-- **API Limit**: 10 requests/second per IP for general API endpoints
-- **Auth Limit**: 5 requests/second per IP for authentication endpoints
-- **Files Limit**: 20 requests/second per IP for file operations
+- **API Endpoints**: 10 requests per 60-second window
+- **Auth Endpoints**: 5 requests per 60-second window  
+- **File Operations**: 20 requests per 60-second window
+- **Global Fallback**: 50 requests per 60-second window
+
+**Fixed-Window Blocking Features**:
+- When any IP exceeds the rate limit, it is completely blocked for a full window duration
+- If a blocked IP makes any request during the blocked period, the block is extended for another full window
+- Window alignment is user-specific: for new IPs, windows align to their first request time; for IPs with previous blocks, new windows start from the end of the last block
+- This provides more aggressive protection than standard token bucket rate limiting, specifically designed to defend against coordinated raid attacks
 
 ### Authentication
 
@@ -62,7 +68,8 @@ Each service has an upstream configuration with:
 ## Configuration Files
 
 - **Main Config**: `/v2/infrastructure/docker/nginx/conf.d/default.conf`
-- **Docker Compose**: Updated service definitions in `docker-compose.yml`
+- **Rate Limiter**: `/v2/infrastructure/docker/nginx/lua/fixed_window_rate_limiter.lua`
+- **Docker Compose**: Updated service definitions in `docker-compose.yml` (uses OpenResty)
 - **Prometheus**: Updated scraping configuration
 - **Alerts**: Gateway-specific alerts in Prometheus rules
 
@@ -70,8 +77,14 @@ Each service has an upstream configuration with:
 
 ### Rate Limiting Test
 ```bash
-# Test rate limiting
+# Test fixed-window rate limiting (should block IP after exceeding limit)
 for i in {1..15}; do curl -w "%{http_code}\n" http://localhost/api/v1/health; done
+
+# Test blocking behavior - subsequent requests should return 429 for full window
+curl -w "%{http_code}\n" http://localhost/api/v1/health
+
+# Test block extension - requests during blocked period extend the block
+for i in {1..5}; do curl -w "%{http_code}\n" http://localhost/api/v1/health; sleep 10; done
 ```
 
 ### Authentication Test
@@ -96,9 +109,10 @@ curl http://localhost/api/v1/auth/health
 ### Common Issues
 
 1. **502 Bad Gateway**: Check if backend services are running
-2. **429 Too Many Requests**: Rate limiting triggered, reduce request frequency
+2. **429 Too Many Requests**: Fixed-window rate limit exceeded, IP blocked for remainder of window
 3. **401 Unauthorized**: Missing or invalid JWT token
 4. **404 Not Found**: Check route configuration and service endpoints
+5. **Rate Limiter Issues**: Check Redis connectivity and Lua script loading
 
 ### Log Analysis
 
