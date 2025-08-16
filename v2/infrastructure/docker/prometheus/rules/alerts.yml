@@ -54,3 +54,39 @@ groups:
         annotations:
           summary: "MinIO storage usage high"
           description: "MinIO storage usage is above 90%."
+
+      - alert: GatewayHighErrorRate
+        expr: rate(nginx_http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on API Gateway"
+          description: "Gateway error rate is {{ $value }} errors per second."
+
+      - alert: GatewayRateLimitTriggered
+        expr: rate(nginx_http_requests_total{status="429"}[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate limiting on API Gateway"
+          description: "Rate limiting triggered {{ $value }} times per second."
+
+      - alert: GatewayAuthFailures
+        expr: rate(nginx_http_requests_total{status="401"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High authentication failures on API Gateway"
+          description: "Authentication failures at {{ $value }} per second."
+
+      - alert: GatewayHighLatency
+        expr: histogram_quantile(0.95, rate(nginx_http_request_duration_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on API Gateway"
+          description: "95th percentile latency is {{ $value }} seconds."
