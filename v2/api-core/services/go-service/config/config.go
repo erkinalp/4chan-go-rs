@@ -116,7 +116,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("CORS_ALLOW_HEADERS", "Authorization,Content-Type")
 	viper.SetDefault("CORS_MAX_AGE", 86400)
 	viper.SetDefault("RATE_LIMIT_ENABLED", true)
-	viper.SetDefault("RATE_LIMIT_REQUESTS", 100)
+	viper.SetDefault("RATE_LIMIT_REQUESTS", 50)
 	viper.SetDefault("RATE_LIMIT_WINDOW_SECONDS", 60)
 	viper.SetDefault("RATE_LIMIT_IP_HEADER", "X-Real-IP")
 

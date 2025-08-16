@@ -96,6 +96,43 @@ curl -w "%{http_code}\n" http://localhost/api/v1/boards/1
 curl -H "Authorization: Bearer your-jwt-token" http://localhost/api/v1/boards/1
 ```
 
+### Backend User-Based Rate Limiting Test
+```bash
+# Run the comprehensive test script
+chmod +x /v2/api-core/test-user-rate-limiting.sh
+./v2/api-core/test-user-rate-limiting.sh
+
+# Or test manually with JWT tokens:
+JWT_TOKEN="your-jwt-token-here"
+
+# Test Go file service user rate limiting (50 requests/60s)
+for i in {1..55}; do curl -H "Authorization: Bearer $JWT_TOKEN" -w "%{http_code}\n" http://localhost:8080/api/v1/health; done
+
+# Test Rust media processor user rate limiting (20 requests/60s)  
+for i in {1..25}; do curl -H "Authorization: Bearer $JWT_TOKEN" -w "%{http_code}\n" http://localhost:8081/api/v1/health; done
+
+# Test NestJS API core user rate limiting (100 requests/60s)
+for i in {1..105}; do curl -H "Authorization: Bearer $JWT_TOKEN" -w "%{http_code}\n" http://localhost:3000/api/v1/health; done
+
+# Test fallback IP-based rate limiting for unauthenticated requests
+for i in {1..55}; do curl -w "%{http_code}\n" http://localhost:8080/api/v1/health; done
+
+# Test block extension behavior
+curl -H "Authorization: Bearer $JWT_TOKEN" -w "%{http_code}\n" http://localhost:8080/api/v1/health
+```
+
+#### JWT Token Format for Testing
+The user-based rate limiting expects JWT tokens with the following claims:
+```json
+{
+  "sub": "user-id-uuid",
+  "role": "USER",
+  "created_at": 1704067200,
+  "exp": 1755357400,
+  "iat": 1755357400
+}
+```
+
 ### Load Balancing Test
 ```bash
 # Test service routing
