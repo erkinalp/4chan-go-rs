@@ -54,3 +54,9 @@ scrape_configs:
       - targets: ['minio-service:9000']
     metrics_path: '/minio/v2/metrics/cluster'
     scrape_interval: 30s
+
+  - job_name: 'nginx-gateway'
+    static_configs:
+      - targets: ['nginx:80']
+    metrics_path: '/nginx_status'
+    scrape_interval: 30s

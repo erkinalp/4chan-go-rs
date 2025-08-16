@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import * as Joi from 'joi';
 
 import { PrismaModule } from './services/prisma/prisma.module';
@@ -12,10 +13,11 @@ import { FilesModule } from './modules/files/files.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { CaptchaModule } from './modules/captcha/captcha.module';
 import { HealthModule } from './modules/health/health.module';
+import { UserRateLimiterInterceptor } from './middleware/user-rate-limiter';
 
 @Module({
   imports: [
-    // Carga y validación de configuración
+    // Carga y validaciï¿½n de configuraciï¿½n
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
@@ -50,7 +52,7 @@ import { HealthModule } from './modules/health/health.module';
     PrismaModule,
     HealthModule,
     
-    // Módulos funcionales
+    // Mï¿½dulos funcionales
     AuthModule,
     BoardsModule,
     ThreadsModule,
@@ -58,6 +60,12 @@ import { HealthModule } from './modules/health/health.module';
     FilesModule,
     ModerationModule,
     CaptchaModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: UserRateLimiterInterceptor,
+    },
   ],
 })
 export class AppModule {}

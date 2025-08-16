@@ -16,6 +16,8 @@ mod services;
 mod utils;
 mod error;
 
+use app_middleware::UserRateLimiter;
+
 use config::Config;
 use repositories::{
     postgres_repository::PostgresRepository, 
@@ -98,6 +100,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Compress::default())
             .wrap(middleware::NormalizePath::trim())
             .wrap(cors)
+            .wrap(UserRateLimiter)
             .app_data(web::Data::new(app_config.clone()))
             .app_data(web::Data::new(postgres_repo))
             .app_data(web::Data::new(redis_repo))
