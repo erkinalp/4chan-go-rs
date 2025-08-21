@@ -4,7 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import * as Joi from 'joi';
 
 import { PrismaModule } from './services/prisma/prisma.module';
-import { AuthModule } from './modules/auth/auth.module';
+import { AuthModule } from './auth/auth.module';
 import { BoardsModule } from './modules/boards/boards.module';
 import { ThreadsModule } from './modules/threads/threads.module';
 import { PostsModule } from './modules/posts/posts.module';
@@ -12,10 +12,10 @@ import { FilesModule } from './modules/files/files.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { CaptchaModule } from './modules/captcha/captcha.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuthController } from './controllers/auth.controller';
 
 @Module({
   imports: [
-    // Carga y validación de configuración
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
@@ -26,10 +26,9 @@ import { HealthModule } from './modules/health/health.module';
         API_PREFIX: Joi.string().default('api'),
         API_VERSION: Joi.string().default('v1'),
         DATABASE_URL: Joi.string().required(),
-        JWT_SECRET: Joi.string().required(),
-        JWT_EXPIRES_IN: Joi.string().default('7d'),
-        JWT_REFRESH_SECRET: Joi.string().required(),
-        JWT_REFRESH_EXPIRES_IN: Joi.string().default('30d'),
+        GNAP_SERVER_URL: Joi.string().required(),
+        GNAP_CLIENT_KEY: Joi.string().required(),
+        GNAP_CLIENT_SECRET: Joi.string().required(),
         RATE_LIMIT_WINDOW: Joi.number().default(15),
         RATE_LIMIT_MAX: Joi.number().default(100),
         CORS_ORIGINS: Joi.string().default(''),
@@ -46,12 +45,10 @@ import { HealthModule } from './modules/health/health.module';
       }),
     }),
 
-    // Servicios core
     PrismaModule,
     HealthModule,
     
-    // Módulos funcionales
-    AuthModule,
+    AuthModule, // GNAP-based authentication module
     BoardsModule,
     ThreadsModule,
     PostsModule,
@@ -59,5 +56,7 @@ import { HealthModule } from './modules/health/health.module';
     ModerationModule,
     CaptchaModule,
   ],
+  controllers: [AuthController],
+  providers: [],
 })
 export class AppModule {}
