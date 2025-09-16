@@ -24,6 +24,7 @@ use crate::repositories::s3_repository::S3Repository;
 use crate::repositories::file_repository::FileRepository;
 use crate::utils;
 use crate::services::malware_scanner::ClamAVScanner;
+use crate::services::ThumbnailGenerator;
 fn ext_matches_mime(ext: &str, mime: &str) -> bool {
     match mime {
         "image/jpeg" => matches!(ext, ".jpg" | ".jpeg"),
@@ -60,7 +61,8 @@ pub async fn upload_file(
     s3_repo: web::Data<S3Repository>,
     file_repo: web::Data<FileRepository>,
     config: web::Data<Config>,
-    scanner: web::Data<ClamAVScanner>
+    scanner: web::Data<ClamAVScanner>,
+    thumbnail_gen: web::Data<ThumbnailGenerator>
 ) -> Result<HttpResponse, Error> {
     let start_time = Instant::now();
     let mut file_data = Vec::new();
@@ -186,11 +188,34 @@ pub async fn upload_file(
     };
     
     let file_id = uuid::Uuid::new_v4();
-    let (file_url, thumbnail_url) = s3_repo.get_ref().upload_file(
+    
+    // Generate thumbnails for images
+    let thumbnail_data = if content_type.starts_with("image/") && thumbnail_gen.is_image_format_supported(&content_type) {
+        match thumbnail_gen.generate_thumbnail(&file_data, "small") {
+            Ok(thumb_data) => Some(thumb_data),
+            Err(e) => {
+                log::warn!("Failed to generate thumbnail: {}", e);
+                None
+            }
+        }
+    } else if content_type.starts_with("video/") {
+        match thumbnail_gen.generate_video_thumbnail(&file_data) {
+            Ok(thumb_data) => Some(thumb_data),
+            Err(e) => {
+                log::warn!("Failed to generate video thumbnail: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+    
+    let (file_url, thumbnail_url) = s3_repo.get_ref().upload_file_with_thumbnail(
         &file_id,
         &file_data,
         &filename,
-        &content_type
+        &content_type,
+        thumbnail_data.as_deref()
     ).await.map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
     
     let file = File {
@@ -309,7 +334,8 @@ pub async fn get_thumbnail(
     path: web::Path<String>,
     query: web::Query<HashMap<String, String>>,
     s3_repo: web::Data<S3Repository>,
-    file_repo: web::Data<FileRepository>
+    file_repo: web::Data<FileRepository>,
+    thumbnail_gen: web::Data<ThumbnailGenerator>
 ) -> Result<HttpResponse, Error> {
     let file_id = uuid::Uuid::parse_str(&path.into_inner())
         .map_err(|_| error::ErrorBadRequest("Invalid file ID"))?;
@@ -320,20 +346,37 @@ pub async fn get_thumbnail(
     
     let size = query.get("size").unwrap_or(&"small".to_string()).to_string();
     
-    let data = s3_repo.get_ref().get_thumbnail(&file_id, &file.thumbnail_filename, &size).await
-        .map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
-    
-    let mut response = HttpResponse::Ok();
-    
-    let thumbnail_type = if file.mime_type.starts_with("image/") {
-        file.mime_type.clone()
-    } else {
-        "image/jpeg".to_string()
-    };
-    
-    response.content_type(thumbnail_type);
-    
-    Ok(response.body(data))
+    // Try to get existing thumbnail first
+    match s3_repo.get_ref().get_thumbnail(&file_id, &file.thumbnail_filename, &size).await {
+        Ok(data) => {
+            let mut response = HttpResponse::Ok();
+            let thumbnail_type = if file.mime_type.starts_with("image/") {
+                "image/jpeg".to_string()
+            } else {
+                "image/jpeg".to_string()
+            };
+            response.content_type(thumbnail_type);
+            Ok(response.body(data))
+        },
+        Err(_) => {
+            // Generate thumbnail on-demand if it doesn't exist
+            if file.mime_type.starts_with("image/") && thumbnail_gen.is_image_format_supported(&file.mime_type) {
+                // Get original file data
+                let original_data = s3_repo.get_ref().get_file(&file_id, &file.stored_filename).await
+                    .map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
+                
+                // Generate thumbnail
+                let thumbnail_data = thumbnail_gen.generate_thumbnail(&original_data, &size)
+                    .map_err(|e| error::ErrorInternalServerError(format!("Thumbnail generation error: {}", e)))?;
+                
+                let mut response = HttpResponse::Ok();
+                response.content_type("image/jpeg");
+                Ok(response.body(thumbnail_data))
+            } else {
+                Err(error::ErrorNotFound("Thumbnail not available for this file type"))
+            }
+        }
+    }
 }
 
 pub async fn check_file_exists(
