@@ -1,10 +1,15 @@
 package handlers
 
 import (
+	"bytes"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -22,6 +27,7 @@ import (
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
 	"github.com/h2non/filetype/types"
+	"golang.org/x/image/webp"
 )
 
 type FileHandler struct {
@@ -570,7 +576,20 @@ func isImage(kind types.Type) bool {
 }
 
 func getImageDimensions(fileData []byte) (width, height int, err error) {
-	return 800, 600, nil
+	reader := bytes.NewReader(fileData)
+	
+	config, _, err := image.DecodeConfig(reader)
+	if err == nil {
+		return config.Width, config.Height, nil
+	}
+	
+	reader.Seek(0, 0)
+	config, err = webp.DecodeConfig(reader)
+	if err == nil {
+		return config.Width, config.Height, nil
+	}
+	
+	return 0, 0, fmt.Errorf("failed to decode image dimensions: %w", err)
 }
 func extMatchesMime(ext string, mime string) bool {
 	if ext == "" {
