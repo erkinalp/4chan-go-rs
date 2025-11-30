@@ -167,6 +167,23 @@ func (r *FileRepository) GetBannedHashes(ctx context.Context) ([]string, error) 
 	return hashes, nil
 }
 
+func (r *FileRepository) IsHashBanned(ctx context.Context, md5Hash string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM banned_files 
+			WHERE md5_hash = $1 AND is_active = true
+		)
+	`
+
+	var exists bool
+	err := r.db.GetPool().QueryRow(ctx, query, md5Hash).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
+
 func (r *FileRepository) GetFileStats(ctx context.Context) (*models.FileStats, error) {
 	totalQuery := `
 		SELECT COUNT(*), COALESCE(SUM(filesize), 0)

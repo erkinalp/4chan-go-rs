@@ -148,6 +148,25 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	sha := sha256.Sum256(fileData)
 	sha256Hash := hex.EncodeToString(sha[:])
 
+	isBanned, err := h.fileRepo.IsHashBanned(c.Request.Context(), md5Hash)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to check banned status",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if isBanned {
+		c.JSON(http.StatusForbidden, models.Error{
+			StatusCode: http.StatusForbidden,
+			Message:    "File is banned",
+			Error:      "This file has been banned and cannot be uploaded",
+		})
+		return
+	}
+
 	existingFile, err := h.fileRepo.GetFileByMD5Hash(c.Request.Context(), md5Hash)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.Error{
