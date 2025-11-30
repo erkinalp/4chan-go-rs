@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
@@ -48,7 +49,7 @@ func (cm *CORSMiddleware) Handler() gin.HandlerFunc {
 			c.Header("Access-Control-Allow-Methods", strings.Join(cm.allowMethods, ", "))
 			c.Header("Access-Control-Allow-Headers", strings.Join(cm.allowHeaders, ", "))
 			c.Header("Access-Control-Allow-Credentials", "true")
-			c.Header("Access-Control-Max-Age", string(rune(cm.maxAge)))
+			c.Header("Access-Control-Max-Age", strconv.Itoa(cm.maxAge))
 			c.Header("Vary", "Origin")
 		}
 
