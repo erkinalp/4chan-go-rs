@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/middleware"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/models"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/repository"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/services"
@@ -45,7 +46,17 @@ func NewFileHandler(storage *storage.MinioClient, fileRepo *repository.FileRepos
 }
 
 func (h *FileHandler) Upload(c *gin.Context) {
+	startTime := time.Now()
+	mimeType := "unknown"
+
+	// Helper to record error metrics
+	recordError := func(status string) {
+		duration := time.Since(startTime).Seconds()
+		middleware.RecordFileUpload(status, mimeType, 0, duration)
+	}
+
 	if err := c.Request.ParseMultipartForm(16 << 20); err != nil {
+		recordError("error_parse")
 		c.JSON(http.StatusBadRequest, models.Error{
 			StatusCode: http.StatusBadRequest,
 			Message:    "Invalid multipart form",
@@ -56,6 +67,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
+		recordError("error_no_file")
 		c.JSON(http.StatusBadRequest, models.Error{
 			StatusCode: http.StatusBadRequest,
 			Message:    "File is required",
@@ -67,6 +79,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	maxSize := int64(10 << 20) // 10MB
 	if header.Size > maxSize {
+		recordError("error_too_large")
 		c.JSON(http.StatusRequestEntityTooLarge, models.Error{
 			StatusCode: http.StatusRequestEntityTooLarge,
 			Message:    "File too large",
@@ -77,6 +90,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	fileData, err := readFile(file, header.Size)
 	if err != nil {
+		recordError("error_read")
 		c.JSON(http.StatusInternalServerError, models.Error{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to read file",
@@ -87,6 +101,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	kind, err := filetype.Match(fileData)
 	if err != nil || kind == filetype.Unknown {
+		recordError("error_unknown_type")
 		c.JSON(http.StatusUnsupportedMediaType, models.Error{
 			StatusCode: http.StatusUnsupportedMediaType,
 			Message:    "Unsupported file type",
@@ -95,7 +110,11 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	// Update mimeType now that we know it
+	mimeType = kind.MIME.Value
+
 	if kind.MIME.Type == "application" && (kind == matchers.TypeExe || kind == matchers.TypeElf) {
+		recordError("error_executable")
 		c.JSON(http.StatusUnsupportedMediaType, models.Error{
 			StatusCode: http.StatusUnsupportedMediaType,
 			Message:    "Executable files are not allowed",
@@ -105,6 +124,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	}
 
 	if !isAllowedFileType(kind) {
+		recordError("error_disallowed_type")
 		c.JSON(http.StatusUnsupportedMediaType, models.Error{
 			StatusCode: http.StatusUnsupportedMediaType,
 			Message:    "Unsupported file type",
@@ -115,6 +135,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if !extMatchesMime(ext, kind.MIME.Value) {
+		recordError("error_ext_mismatch")
 		c.JSON(http.StatusUnsupportedMediaType, models.Error{
 			StatusCode: http.StatusUnsupportedMediaType,
 			Message:    "File extension does not match content type",
@@ -126,6 +147,8 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	if h.scanner != nil {
 		clean, reason, scanErr := h.scanner.Scan(c.Request.Context(), fileData)
 		if scanErr != nil {
+			middleware.RecordMalwareScan("error")
+			recordError("error_malware_scan")
 			c.JSON(http.StatusServiceUnavailable, models.Error{
 				StatusCode: http.StatusServiceUnavailable,
 				Message:    "Malware scanner unavailable",
@@ -134,6 +157,8 @@ func (h *FileHandler) Upload(c *gin.Context) {
 			return
 		}
 		if !clean {
+			middleware.RecordMalwareScan("infected")
+			recordError("error_malware_detected")
 			c.JSON(http.StatusUnprocessableEntity, models.Error{
 				StatusCode: http.StatusUnprocessableEntity,
 				Message:    "Malicious content detected",
@@ -141,6 +166,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 			})
 			return
 		}
+		middleware.RecordMalwareScan("clean")
 	}
 
 	hash := md5.Sum(fileData)
@@ -150,6 +176,8 @@ func (h *FileHandler) Upload(c *gin.Context) {
 
 	isBanned, err := h.fileRepo.IsHashBanned(c.Request.Context(), md5Hash)
 	if err != nil {
+		middleware.RecordBannedFileCheck("error")
+		recordError("error_banned_check")
 		c.JSON(http.StatusInternalServerError, models.Error{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to check banned status",
@@ -159,6 +187,8 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	}
 
 	if isBanned {
+		middleware.RecordBannedFileCheck("banned")
+		recordError("error_banned")
 		c.JSON(http.StatusForbidden, models.Error{
 			StatusCode: http.StatusForbidden,
 			Message:    "File is banned",
@@ -166,9 +196,11 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		})
 		return
 	}
+	middleware.RecordBannedFileCheck("allowed")
 
 	existingFile, err := h.fileRepo.GetFileByMD5Hash(c.Request.Context(), md5Hash)
 	if err != nil {
+		recordError("error_duplicate_check")
 		c.JSON(http.StatusInternalServerError, models.Error{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to check for duplicate file",
@@ -178,6 +210,10 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	}
 
 	if existingFile != nil {
+		// File already exists - record as deduplicated
+		middleware.RecordFileDeduplication()
+		duration := time.Since(startTime).Seconds()
+		middleware.RecordFileUpload("deduplicated", mimeType, existingFile.Filesize, duration)
 		c.JSON(http.StatusOK, models.FileUploadResponse{
 			ID:             existingFile.ID,
 			FileURL:        fmt.Sprintf("/files/%s/content", existingFile.ID),
@@ -213,8 +249,13 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	timestamp := time.Now().Unix()
 	uniqueFileName := fmt.Sprintf("%d_%s%s", timestamp, fileID, ext)
 
+	storageStart := time.Now()
 	uploadInfo, err := h.storage.UploadFile(c.Request.Context(), fileData, uniqueFileName, kind.MIME.Value)
+	storageDuration := time.Since(storageStart).Seconds()
+	middleware.RecordStorageOperationWithDuration("upload", storageDuration)
 	if err != nil {
+		middleware.RecordStorageOperation("upload", "error")
+		recordError("error_storage")
 		c.JSON(http.StatusInternalServerError, models.Error{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to upload file",
@@ -222,6 +263,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		})
 		return
 	}
+	middleware.RecordStorageOperation("upload", "success")
 
 	thumbnailURL := uploadInfo.ThumbnailURL
 
@@ -241,6 +283,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	}
 
 	if err := h.fileRepo.CreateFile(c.Request.Context(), dbFile); err != nil {
+		recordError("error_db_save")
 		c.JSON(http.StatusInternalServerError, models.Error{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to save file metadata",
@@ -248,6 +291,10 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		})
 		return
 	}
+
+	// Record successful upload
+	duration := time.Since(startTime).Seconds()
+	middleware.RecordFileUpload("success", mimeType, header.Size, duration)
 
 	response := models.FileUploadResponse{
 		ID:             fileID,
@@ -260,7 +307,7 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		MimeType:       kind.MIME.Value,
 		MD5Hash:        md5Hash,
 		IsSpoilered:    spoiler,
-		UploadDuration: 0, // In a real app, you would measure this
+		UploadDuration: int(duration * 1000), // Convert to milliseconds
 	}
 
 	c.JSON(http.StatusCreated, response)
