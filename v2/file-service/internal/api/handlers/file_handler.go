@@ -25,22 +25,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/h2non/filetype"
+	"github.com/rs/zerolog"
 	"github.com/h2non/filetype/matchers"
 	"github.com/h2non/filetype/types"
 	"golang.org/x/image/webp"
 )
 
 type FileHandler struct {
-	storage  *storage.MinioClient
-	fileRepo *repository.FileRepository
-	scanner  services.MalwareScanner
+	storage   *storage.MinioClient
+	fileRepo  *repository.FileRepository
+	queueRepo *repository.QueueRepository
+	scanner   services.MalwareScanner
+	logger    zerolog.Logger
 }
 
-func NewFileHandler(storage *storage.MinioClient, fileRepo *repository.FileRepository, scanner services.MalwareScanner) *FileHandler {
+func NewFileHandler(storage *storage.MinioClient, fileRepo *repository.FileRepository, queueRepo *repository.QueueRepository, scanner services.MalwareScanner, logger zerolog.Logger) *FileHandler {
 	return &FileHandler{
-		storage:  storage,
-		fileRepo: fileRepo,
-		scanner:  scanner,
+		storage:   storage,
+		fileRepo:  fileRepo,
+		queueRepo: queueRepo,
+		scanner:   scanner,
+		logger:    logger,
 	}
 }
 
@@ -228,6 +233,13 @@ func (h *FileHandler) Upload(c *gin.Context) {
 			Error:      err.Error(),
 		})
 		return
+	}
+
+	// Enqueue file for background processing (e.g. advanced thumbnail generation, analysis)
+	// We use a high priority for new uploads
+	if err := h.queueRepo.Enqueue(c.Request.Context(), fileID, models.QueueTaskTypeProcessFile, 10); err != nil {
+		// Log error but don't fail the request as the file is already uploaded
+		h.logger.Error().Err(err).Msg("Failed to enqueue file for processing")
 	}
 
 	response := models.FileUploadResponse{
