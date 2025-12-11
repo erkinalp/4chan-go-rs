@@ -14,6 +14,8 @@ import (
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/storage"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/database"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/repository"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/worker"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -65,6 +67,12 @@ func main() {
 
 	// Initialize API router
 	router := api.NewRouter(cfg, logger, db, redis, fileStorage)
+
+	// Initialize and start background worker
+	queueRepo := repository.NewQueueRepository(db)
+	bgWorker := worker.NewWorker(queueRepo, logger)
+	bgWorker.Start()
+	defer bgWorker.Stop()
 
 	// Create HTTP server
 	server := &http.Server{
