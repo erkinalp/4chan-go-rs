@@ -10,6 +10,7 @@ import (
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/services"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	swaggerFiles "github.com/swaggo/files"
 )
@@ -17,7 +18,7 @@ import (
 // NewRouter creates a router for the file-service with full middleware stack
 func NewRouter(
 	cfg *config.Config,
-	_ interface{},
+	logger zerolog.Logger,
 	db *database.PostgresDB,
 	redis *database.RedisClient,
 	fileStorage *storage.MinioClient,
@@ -51,8 +52,9 @@ func NewRouter(
 
 	// Initialize repositories and services
 	fileRepo := repository.NewFileRepository(db)
+	queueRepo := repository.NewQueueRepository(db)
 	malwareScanner := services.NewClamAVScanner(cfg.MalwareScanner)
-	fileHandler := handlers.NewFileHandler(fileStorage, fileRepo, malwareScanner)
+	fileHandler := handlers.NewFileHandler(fileStorage, fileRepo, queueRepo, malwareScanner, logger)
 
 	// API routes
 	apiPrefix := cfg.Server.APIPrefix + "/" + cfg.Server.APIVersion
