@@ -25,12 +25,31 @@ func NewRouter(
 ) *gin.Engine {
 	router := gin.New()
 
-	// Initialize GNAP client for authentication
+	// Initialize GNAP client for authentication using proper GNAP config
+	// Falls back to JWT config if GNAP config is not set (for backwards compatibility)
+	gnapServerURL := cfg.GNAP.ServerURL
+	gnapClientKey := cfg.GNAP.ClientKey
+	gnapClientSecret := cfg.GNAP.ClientSecret
+	if gnapServerURL == "" {
+		gnapServerURL = cfg.JWT.Issuer
+	}
+	if gnapClientKey == "" {
+		gnapClientKey = cfg.JWT.SecretKey
+	}
+	if gnapClientSecret == "" {
+		gnapClientSecret = cfg.JWT.RefreshSecret
+	}
 	gnapClient := auth.NewGNAPClient(
-		cfg.JWT.Issuer,
-		cfg.JWT.SecretKey,
-		cfg.JWT.RefreshSecret,
+		gnapServerURL,
+		gnapClientKey,
+		gnapClientSecret,
 	)
+
+	// Initialize media processor client for thumbnail generation
+	var mediaProcessor *services.MediaProcessorClient
+	if cfg.MediaProcessor.Enabled && cfg.MediaProcessor.BaseURL != "" {
+		mediaProcessor = services.NewMediaProcessorClient(cfg.MediaProcessor.BaseURL)
+	}
 
 	// Initialize middleware
 	corsMiddleware := middleware.NewCORSMiddleware(cfg.CORS)
@@ -54,7 +73,7 @@ func NewRouter(
 	fileRepo := repository.NewFileRepository(db)
 	queueRepo := repository.NewQueueRepository(db)
 	malwareScanner := services.NewClamAVScanner(cfg.MalwareScanner)
-	fileHandler := handlers.NewFileHandler(fileStorage, fileRepo, queueRepo, malwareScanner, logger)
+	fileHandler := handlers.NewFileHandler(fileStorage, fileRepo, queueRepo, malwareScanner, mediaProcessor, logger)
 
 	// API routes
 	apiPrefix := cfg.Server.APIPrefix + "/" + cfg.Server.APIVersion

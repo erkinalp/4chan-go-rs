@@ -25,7 +25,7 @@ func (r *FileRepository) GetFileByID(ctx context.Context, fileID string) (*model
 	query := `
 		SELECT id, filename, stored_filename, filesize, width, height, 
 		       thumbnail_filename, mime_type, md5_hash, sha256_hash, 
-		       is_spoilered, created_at, post_id
+		       is_spoilered, created_at, post_id, COALESCE(uploader_id, '')
 		FROM files
 		WHERE id = $1
 	`
@@ -45,6 +45,7 @@ func (r *FileRepository) GetFileByID(ctx context.Context, fileID string) (*model
 		&file.IsSpoilered,
 		&file.CreatedAt,
 		&file.PostID,
+		&file.UploaderID,
 	)
 
 	if err != nil {
@@ -61,7 +62,7 @@ func (r *FileRepository) GetFileByMD5Hash(ctx context.Context, md5Hash string) (
 	query := `
 		SELECT id, filename, stored_filename, filesize, width, height, 
 		       thumbnail_filename, mime_type, md5_hash, sha256_hash, 
-		       is_spoilered, created_at, post_id
+		       is_spoilered, created_at, post_id, COALESCE(uploader_id, '')
 		FROM files
 		WHERE md5_hash = $1
 		LIMIT 1
@@ -82,6 +83,7 @@ func (r *FileRepository) GetFileByMD5Hash(ctx context.Context, md5Hash string) (
 		&file.IsSpoilered,
 		&file.CreatedAt,
 		&file.PostID,
+		&file.UploaderID,
 	)
 
 	if err != nil {
@@ -99,9 +101,9 @@ func (r *FileRepository) CreateFile(ctx context.Context, file *models.File) erro
 		INSERT INTO files (
 			id, filename, stored_filename, filesize, width, height, 
 			thumbnail_filename, mime_type, md5_hash, sha256_hash, 
-			is_spoilered, created_at, post_id
+			is_spoilered, created_at, post_id, uploader_id
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 		)
 	`
 
@@ -127,6 +129,7 @@ func (r *FileRepository) CreateFile(ctx context.Context, file *models.File) erro
 		file.IsSpoilered,
 		file.CreatedAt,
 		file.PostID,
+		file.UploaderID,
 	)
 
 	return err

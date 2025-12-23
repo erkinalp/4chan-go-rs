@@ -33,20 +33,22 @@ import (
 )
 
 type FileHandler struct {
-	storage   *storage.MinioClient
-	fileRepo  *repository.FileRepository
-	queueRepo *repository.QueueRepository
-	scanner   services.MalwareScanner
-	logger    zerolog.Logger
+	storage        *storage.MinioClient
+	fileRepo       *repository.FileRepository
+	queueRepo      *repository.QueueRepository
+	scanner        services.MalwareScanner
+	mediaProcessor *services.MediaProcessorClient
+	logger         zerolog.Logger
 }
 
-func NewFileHandler(storage *storage.MinioClient, fileRepo *repository.FileRepository, queueRepo *repository.QueueRepository, scanner services.MalwareScanner, logger zerolog.Logger) *FileHandler {
+func NewFileHandler(storage *storage.MinioClient, fileRepo *repository.FileRepository, queueRepo *repository.QueueRepository, scanner services.MalwareScanner, mediaProcessor *services.MediaProcessorClient, logger zerolog.Logger) *FileHandler {
 	return &FileHandler{
-		storage:   storage,
-		fileRepo:  fileRepo,
-		queueRepo: queueRepo,
-		scanner:   scanner,
-		logger:    logger,
+		storage:        storage,
+		fileRepo:       fileRepo,
+		queueRepo:      queueRepo,
+		scanner:        scanner,
+		mediaProcessor: mediaProcessor,
+		logger:         logger,
 	}
 }
 
@@ -271,6 +273,26 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	middleware.RecordStorageOperation("upload", "success")
 
 	thumbnailURL := uploadInfo.ThumbnailURL
+	thumbnailFilename := filepath.Base(thumbnailURL)
+
+	// Generate thumbnails using media processor if available and file is an image
+	if h.mediaProcessor != nil && isImage(kind) {
+		thumbResp, thumbErr := h.mediaProcessor.GenerateThumbnail(c.Request.Context(), fileData, uniqueFileName, kind.MIME.Value, "medium")
+		if thumbErr != nil {
+			h.logger.Warn().Err(thumbErr).Msg("Failed to generate thumbnail via media processor, using fallback")
+		} else if thumbResp != nil && thumbResp.ThumbnailPath != "" {
+			thumbnailFilename = thumbResp.ThumbnailPath
+			thumbnailURL = thumbResp.ThumbnailURL
+		}
+	}
+
+	// Get uploader ID from authenticated user context
+	var uploaderID string
+	if userID, exists := c.Get("userID"); exists && userID != nil {
+		if uid, ok := userID.(string); ok {
+			uploaderID = uid
+		}
+	}
 
 	dbFile := &models.File{
 		ID:                fileID,
@@ -279,12 +301,13 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		Filesize:          header.Size,
 		Width:             width,
 		Height:            height,
-		ThumbnailFilename: filepath.Base(thumbnailURL),
+		ThumbnailFilename: thumbnailFilename,
 		MimeType:          kind.MIME.Value,
 		MD5Hash:           md5Hash,
 		SHA256Hash:        sha256Hash,
 		IsSpoilered:       spoiler,
 		CreatedAt:         time.Now(),
+		UploaderID:        uploaderID,
 	}
 
 	if err := h.fileRepo.CreateFile(c.Request.Context(), dbFile); err != nil {
@@ -383,6 +406,36 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 			StatusCode: http.StatusNotFound,
 			Message:    "File not found",
 			Error:      fmt.Sprintf("No file found with ID: %s", fileID),
+		})
+		return
+	}
+
+	// Ownership check: user can only delete their own files unless they are admin/moderator
+	userID, userIDExists := c.Get("userID")
+	userRole, roleExists := c.Get("userRole")
+
+	canDelete := false
+	if roleExists {
+		if role, ok := userRole.(string); ok {
+			if role == "admin" || role == "moderator" {
+				canDelete = true
+			}
+		}
+	}
+
+	if !canDelete && userIDExists {
+		if uid, ok := userID.(string); ok {
+			if file.UploaderID != "" && file.UploaderID == uid {
+				canDelete = true
+			}
+		}
+	}
+
+	if !canDelete {
+		c.JSON(http.StatusForbidden, models.Error{
+			StatusCode: http.StatusForbidden,
+			Message:    "Permission denied",
+			Error:      "You can only delete files you uploaded",
 		})
 		return
 	}

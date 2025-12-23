@@ -103,6 +103,10 @@ func (am *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		c.Set("userRole", userCtx.Role)
 		c.Set("userPermissions", userCtx.Permissions)
 		c.Set("userContext", userCtx)
+		// Set userCreatedAt for rate limiter window alignment
+		if !userCtx.CreatedAt.IsZero() {
+			c.Set("userCreatedAt", userCtx.CreatedAt)
+		}
 
 		c.Next()
 	}
@@ -146,6 +150,10 @@ func (am *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 		c.Set("userRole", userCtx.Role)
 		c.Set("userPermissions", userCtx.Permissions)
 		c.Set("userContext", userCtx)
+		// Set userCreatedAt for rate limiter window alignment
+		if !userCtx.CreatedAt.IsZero() {
+			c.Set("userCreatedAt", userCtx.CreatedAt)
+		}
 
 		c.Next()
 	}
