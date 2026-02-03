@@ -15,9 +15,9 @@ serde = { version = "1.0.171", features = ["derive"] }
 serde_json = "1.0.103"
 sqlx = { version = "0.8.1", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros"] }
 deadpool-redis = { version = "0.13.0", features = ["serde"] }
-aws-sdk-s3 = "1.112.0"
+aws-sdk-s3 = "1.121.0"
 aws-config = "0.55.3"
-jsonwebtoken = "8.3.0"
+jsonwebtoken = "10.3.0"
 uuid = { version = "1.4.1", features = ["serde", "v4"] }
 chrono = { version = "0.4.26", features = ["serde"] }
 argon2 = "0.5.0"
