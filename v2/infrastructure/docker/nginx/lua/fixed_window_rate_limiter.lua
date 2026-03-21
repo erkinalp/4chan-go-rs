@@ -122,7 +122,7 @@ function _M.check_rate_limit()
             error = "Service temporarily unavailable",
             message = "Rate limiter backend unavailable"
         }))
-        ngx.exit(503)
+        return ngx.exit(503)
     end
     
     if is_blocked_and_extend(red, ip, limit_type, config.window) then
