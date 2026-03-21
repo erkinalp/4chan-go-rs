@@ -88,7 +88,7 @@ pub struct RateLimitConfig {
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         // Load .env file if it exists
-        dotenv::dotenv().ok();
+        dotenvy::dotenv().ok();
 
         // Set default configuration
         let mut s = ConfigLib::default();

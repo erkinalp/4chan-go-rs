@@ -7,57 +7,58 @@ edition = "2021"
 resolver = "2"
 
 [dependencies]
-actix-web = "4.4.0"
-actix-cors = "0.6.4"
-actix-rt = "2.9.0"
-actix-files = "0.6.2"
-tokio = { version = "1.29.1", features = ["full"] }
-tokio-stream = "0.1.14"
-futures = "0.3.28"
-serde = { version = "1.0.171", features = ["derive"] }
-serde_json = "1.0.103"
-sqlx = { version = "0.8.1", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros", "chrono"] }
-deadpool-redis = { version = "0.13.0", features = ["serde"] }
-aws-sdk-s3 = "1.6.1"
+actix-web = "4.10.2"
+actix-cors = "0.7.0"
+actix-rt = "2.10.0"
+actix-files = "0.6.6"
+tokio = { version = "1.44.2", features = ["full"] }
+tokio-stream = "0.1.17"
+futures = "0.3.31"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+sqlx = { version = "0.8.5", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros", "chrono"] }
+deadpool-redis = { version = "0.18.0", features = ["serde"] }
+aws-sdk-s3 = "1.82.0"
 aws-config = "1.6.1"
 jsonwebtoken = "10.3.0"
-uuid = { version = "1.4.1", features = ["serde", "v4"] }
-chrono = { version = "0.4.26", features = ["serde"] }
-argon2 = "0.5.0"
-rand = "0.8.5"
-dotenv = "0.15.0"
-config = "0.13.3"
+uuid = { version = "1.16.0", features = ["serde", "v4"] }
+chrono = { version = "0.4.40", features = ["serde"] }
+argon2 = "0.5.3"
+rand = "0.9.1"
+dotenvy = "0.15.7"
+config = "0.15.11"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-validator = { version = "0.16.1", features = ["derive"] }
+validator = { version = "0.20.0", features = ["derive"] }
 mime = "0.3.17"
-actix-multipart = "0.6.1"
-image = "0.24.6"
+actix-multipart = "0.7.2"
+image = "0.25.6"
 md5 = "0.7.0"
-sha2 = "0.10.7"
-actix-web-prom = { version = "0.9.0", default-features = false }
+sha2 = "0.10.9"
+actix-web-prom = { version = "0.9.0", default-features = false }  # confirmed: using actix-web-prom (not deprecated actix-web-prometheus)
 prometheus = { version = "0.14.0", features = ["process"], default-features = false }
-base64 = "0.13.0"
-log = "0.4.20"
-derive_more = "0.99.17"
+base64 = "0.22.1"
+log = "0.4.27"
+derive_more = "2.0.1"
 sanitize_html = "0.7.0"
-thiserror = "1.0.44"
-anyhow = "1.0.72"
+thiserror = "2.0.12"
+anyhow = "1.0.98"
 secrecy = { version = "0.8.0", features = ["serde"] }
-reqwest = { version = "0.11.18", features = ["json"] }
-actix-session = { version = "0.7.2", features = ["redis-rs-session"] }
-redis = { version = "0.23.0", features = ["tokio-comp"] }
+reqwest = { version = "0.12.15", features = ["json"] }
+actix-session = { version = "0.10.1", features = ["redis-session"] }
+redis = { version = "0.27.6", features = ["tokio-comp"] }
 actix-service = "2.0.2"
-futures-util = "0.3.28"
+bytes = "1.11.1"  # pinned to fix RUSTSEC-2026-0007
+futures-util = "0.3.31"
 
 [dev-dependencies]
 actix-rt = "2.9.0"
 tokio-test = "0.4.2"
-mockall = "0.11.4"
-fake = "2.6.1"
-rstest = "0.18.1"
-wiremock = "0.5.19"
-claim = "0.5.0"
+mockall = "0.13.1"
+fake = "3.1.0"
+rstest = "0.25.0"
+wiremock = "0.6.2"
+claims = "0.8.0"
 
 [profile.release]
 opt-level = 3

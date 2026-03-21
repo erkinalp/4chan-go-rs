@@ -107,7 +107,7 @@ pub struct FileConfig {
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         // Load .env file if it exists
-        dotenv::dotenv().ok();
+        dotenvy::dotenv().ok();
 
         let env = env::var("RUN_ENV").unwrap_or_else(|_| "development".into());
         let database_url = env::var("DATABASE_URL").ok();
