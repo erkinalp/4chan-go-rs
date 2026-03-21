@@ -1,6 +1,6 @@
 module github.com/erkinalp/4chan-go-rs/v2/api-core/services/file-service
 
-go 1.25.0
+go 1.24.0
 
 require (
 	github.com/gin-gonic/gin v1.12.0
