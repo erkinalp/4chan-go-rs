@@ -5,25 +5,25 @@ use std::convert::From;
 
 #[derive(Debug, Display, Error)]
 pub enum AppError {
-    #[display(fmt = "Bad Request: {}", _0)]
+    #[display("Bad Request: {_0}")]
     BadRequest(String),
     
-    #[display(fmt = "Unauthorized: {}", _0)]
+    #[display("Unauthorized: {_0}")]
     Unauthorized(String),
     
-    #[display(fmt = "Forbidden: {}", _0)]
+    #[display("Forbidden: {_0}")]
     Forbidden(String),
     
-    #[display(fmt = "Not Found: {}", _0)]
+    #[display("Not Found: {_0}")]
     NotFound(String),
     
-    #[display(fmt = "Conflict: {}", _0)]
+    #[display("Conflict: {_0}")]
     Conflict(String),
     
-    #[display(fmt = "Too Many Requests: {}", _0)]
+    #[display("Too Many Requests: {_0}")]
     TooManyRequests(String),
     
-    #[display(fmt = "Internal Server Error: {}", _0)]
+    #[display("Internal Server Error: {_0}")]
     InternalServerError(String),
 }
 

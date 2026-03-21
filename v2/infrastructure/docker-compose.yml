@@ -61,11 +61,11 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://[USERNAME]:[PASSWORD]@postgres:5432/4chan?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4chan}?schema=public
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=[REDACTED]
-      - JWT_REFRESH_SECRET=[REDACTED]
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - FILE_STORAGE_TYPE=local
     depends_on:
       - postgres
@@ -87,11 +87,11 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://[USERNAME]:[PASSWORD]@postgres:5432/4chan?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4chan}?schema=public
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=[REDACTED]
-      - JWT_REFRESH_SECRET=[REDACTED]
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
     depends_on:
       - postgres
       - redis
@@ -111,10 +111,10 @@ services:
     environment:
       - ENVIRONMENT=development
       - PORT=8080
-      - DATABASE_URL=postgresql://[USERNAME]:[PASSWORD]@postgres:5432/4chan?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4chan}?schema=public
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=[REDACTED]
+      - JWT_SECRET=${JWT_SECRET}
       - FILE_STORAGE_TYPE=local
       - FILE_STORAGE_PATH=/app/uploads
     depends_on:
@@ -137,13 +137,13 @@ services:
     environment:
       - APP_SERVER__HOST=0.0.0.0
       - APP_SERVER__PORT=8081
-      - APP_DATABASE__URL=postgresql://[USERNAME]:[PASSWORD]@postgres:5432/4chan
+      - APP_DATABASE__URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4chan}
       - APP_REDIS__HOST=redis
       - APP_REDIS__PORT=6379
-      - APP_JWT__SECRET=[REDACTED]
+      - APP_JWT__SECRET=${JWT_SECRET}
       - APP_S3__ENDPOINT=http://minio:9000
-      - APP_S3__ACCESS_KEY=[USERNAME]
-      - APP_S3__SECRET_KEY=[PASSWORD]
+      - APP_S3__ACCESS_KEY=${MINIO_ROOT_USER}
+      - APP_S3__SECRET_KEY=${MINIO_ROOT_PASSWORD}
     depends_on:
       - postgres
       - redis
@@ -163,9 +163,9 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d
     environment:
-      - POSTGRES_USER=[USERNAME]
-      - POSTGRES_PASSWORD=[PASSWORD]
-      - POSTGRES_DB=4chan
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-4chan}
     networks:
       - backend
     healthcheck:
@@ -202,8 +202,8 @@ services:
     volumes:
       - minio_data:/data
     environment:
-      - MINIO_ROOT_USER=[USERNAME]
-      - MINIO_ROOT_PASSWORD=[PASSWORD]
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     command: server --console-address ":9001" /data
     networks:
       - backend
@@ -254,7 +254,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/provisioning:/etc/grafana/provisioning
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=[PASSWORD]
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus

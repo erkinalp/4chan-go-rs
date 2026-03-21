@@ -156,7 +156,8 @@ function _M.check_circuit(service)
     
     local red = connect_redis()
     if not red then
-        return true -- Allow if Redis unavailable (fail open)
+        ngx.log(ngx.ERR, "Circuit breaker: Redis unavailable, denying request (fail-closed)")
+        return false -- Deny if Redis unavailable (fail closed for safety)
     end
     
     local state = get_circuit_state(red, service)

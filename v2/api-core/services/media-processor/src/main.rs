@@ -1,6 +1,6 @@
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
-use actix_web_prometheus::PrometheusMetricsBuilder;
+use actix_web_prom::PrometheusMetricsBuilder;
 use prometheus::Registry;
 use std::net::TcpListener;
 use tracing::{info, Level};
