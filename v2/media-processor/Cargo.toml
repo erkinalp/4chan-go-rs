@@ -24,7 +24,7 @@ jsonwebtoken = "10.3.0"
 uuid = { version = "1.16.0", features = ["serde", "v4"] }
 chrono = { version = "0.4.40", features = ["serde"] }
 argon2 = "0.5.3"
-rand = "0.9.1"
+rand = "0.9.3"
 dotenvy = "0.15.7"
 config = "0.15.11"
 tracing = "0.1.37"
