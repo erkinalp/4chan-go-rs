@@ -1,13 +1,13 @@
 module github.com/erkinalp/4chan-go-rs/v2/api-core/services/go-service
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/erkinalp/4chan-go-rs/v2/file-service v0.0.0-20250930171555-291ac65eb64b
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/h2non/filetype v1.1.3
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.0
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.99
 	github.com/prometheus/client_golang v1.23.2
