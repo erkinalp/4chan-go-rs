@@ -71,7 +71,7 @@
     "vite": "^8.0.6",
     "vite-plugin-svgr": "^4.2.0",
     "vite-tsconfig-paths": "^4.2.2",
-    "vitest": "^1.1.0"
+    "vitest": "^4.1.8"
   },
   "scripts": {
     "dev": "vite",
