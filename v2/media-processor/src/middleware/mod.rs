@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 // Define middleware for JWT authentication
 pub fn jwt_auth() -> JwtAuth {
-    JwtAuth::default()
+    JwtAuth
 }
 
 // Define middleware for role-based authorization

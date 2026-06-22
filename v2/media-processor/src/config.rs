@@ -122,7 +122,7 @@ impl Config {
 
         // Build and deserialize configuration
         let config = builder.build()?;
-        Ok(config.try_deserialize()?)
+        config.try_deserialize()
     }
 }
 

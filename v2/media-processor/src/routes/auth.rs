@@ -1,4 +1,4 @@
-use actix_web::{web, HttpRequest, HttpResponse, Result, Scope};
+use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -152,7 +152,7 @@ impl GNAPClient {
     ) -> Result<GNAPGrantResponse, Box<dyn std::error::Error>> {
         let response = self
             .http_client
-            .post(&format!("{}/gnap", self.server_url))
+            .post(format!("{}/gnap", self.server_url))
             .header("Authorization", format!("Bearer {}", self.client_key))
             .json(request)
             .send()
@@ -172,7 +172,7 @@ impl GNAPClient {
 
         let response = self
             .http_client
-            .post(&format!("{}/gnap/introspect", self.server_url))
+            .post(format!("{}/gnap/introspect", self.server_url))
             .header("Authorization", format!("Bearer {}", token))
             .send()
             .await?;

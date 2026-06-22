@@ -3,7 +3,7 @@ use crate::handlers::files::{
     get_file_stats, get_thumbnail, purge_files, upload_file,
 };
 use crate::middleware::{jwt_auth, require_role};
-use actix_web::{web, Scope};
+use actix_web::web;
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(

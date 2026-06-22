@@ -103,7 +103,7 @@ impl S3Repository {
             .key(&unique_filename)
             .body(file_data.to_vec().into())
             .content_type(content_type)
-            .metadata("file-id", &_file_id.to_string())
+            .metadata("file-id", _file_id.to_string())
             .send()
             .await?;
 
@@ -134,7 +134,7 @@ impl S3Repository {
             .key(&unique_filename)
             .body(file_data.to_vec().into())
             .content_type(content_type)
-            .metadata("file-id", &file_id.to_string())
+            .metadata("file-id", file_id.to_string())
             .send()
             .await?;
 
@@ -153,7 +153,7 @@ impl S3Repository {
                 .key(&thumb_key)
                 .body(thumb_data.to_vec().into())
                 .content_type("image/jpeg")
-                .metadata("file-id", &file_id.to_string())
+                .metadata("file-id", file_id.to_string())
                 .metadata("type", "thumbnail")
                 .send()
                 .await?;

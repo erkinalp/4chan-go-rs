@@ -1,7 +1,8 @@
+#![allow(dead_code, deprecated)]
+
 use actix_cors::Cors;
 use actix_web::{middleware as actix_middleware, web, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
-use prometheus::Registry;
 use std::net::TcpListener;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -10,7 +11,6 @@ mod config;
 mod handlers;
 mod middleware;
 mod routes;
-use middleware as app_middleware;
 mod error;
 mod models;
 mod repositories;

@@ -8,8 +8,7 @@ pub struct RedisRepository {
 
 impl RedisRepository {
     pub fn new(url: &str) -> Result<Self> {
-        let mut cfg = RedisConfig::default();
-        cfg.url = Some(url.to_string());
+        let cfg = RedisConfig { url: Some(url.to_string()), ..RedisConfig::default() };
         let pool = cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1))?;
         Ok(Self { pool })
     }

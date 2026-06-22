@@ -100,11 +100,11 @@ pub async fn upload_file(
                 let mut value = String::new();
                 while let Some(chunk) = field.next().await {
                     let data = chunk?;
-                    value.extend(std::str::from_utf8(&data).unwrap_or_default().chars());
+                    value.push_str(std::str::from_utf8(&data).unwrap_or_default());
                 }
                 is_spoiler = value == "true";
             }
-            _ => while let Some(_) = field.next().await {},
+            _ => while field.next().await.is_some() {},
         }
     }
 
@@ -348,21 +348,21 @@ pub async fn get_file_content(
         .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?
         .ok_or_else(|| error::ErrorNotFound("File not found"))?;
 
-    let download = query.get("download").map_or(false, |v| v == "true");
+    let download = query.get("download").is_some_and(|v| v == "true");
 
     if download {
         let url = s3_repo
             .get_ref()
             .get_presigned_url(
-                &file.stored_filename.as_ref().unwrap_or(&String::new()),
+                file.stored_filename.as_ref().unwrap_or(&String::new()),
                 3600, // 1 hour
             )
             .await
             .map_err(|e| error::ErrorInternalServerError(format!("S3 error: {}", e)))?;
 
-        return Ok(HttpResponse::TemporaryRedirect()
+        Ok(HttpResponse::TemporaryRedirect()
             .append_header(("Location", url))
-            .finish());
+            .finish())
     } else {
         let data = s3_repo
             .get_ref()
@@ -407,11 +407,7 @@ pub async fn get_thumbnail(
     {
         Ok(data) => {
             let mut response = HttpResponse::Ok();
-            let thumbnail_type = if file.mime_type.starts_with("image/") {
-                "image/jpeg".to_string()
-            } else {
-                "image/jpeg".to_string()
-            };
+            let thumbnail_type = "image/jpeg".to_string();
             response.content_type(thumbnail_type);
             Ok(response.body(data))
         }

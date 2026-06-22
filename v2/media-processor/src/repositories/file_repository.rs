@@ -1,5 +1,4 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use sqlx::{postgres::PgRow, Row};
 use uuid::Uuid;
 
@@ -96,7 +95,7 @@ impl FileRepository {
         "#;
 
         sqlx::query(query)
-            .bind(&file.id)
+            .bind(file.id)
             .bind(&file.filename)
             .bind(&file.stored_filename)
             .bind(file.filesize)
@@ -108,7 +107,7 @@ impl FileRepository {
             .bind(&file.sha256_hash)
             .bind(file.is_spoilered)
             .bind(file.created_at)
-            .bind(&file.post_id)
+            .bind(file.post_id)
             .execute(&self.postgres.pool)
             .await?;
 
@@ -255,7 +254,7 @@ impl FileRepository {
         let files_to_delete = q.fetch_all(&self.postgres.pool).await?;
 
         let mut deleted_count = 0;
-        let mut freed_space = 0;
+        let freed_space = 0;
 
         if let Some(s3) = s3_repo {
             for (file_id, stored_filename) in &files_to_delete {

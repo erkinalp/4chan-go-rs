@@ -1,7 +1,6 @@
 use actix_web::{HttpResponse, ResponseError};
 use derive_more::Display;
 use serde_json::json;
-use std::convert::From;
 use std::error::Error as StdError;
 
 #[derive(Debug, Display)]

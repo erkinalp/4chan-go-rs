@@ -1,4 +1,4 @@
-use actix_web::{web, HttpResponse, Scope};
+use actix_web::{web, HttpResponse};
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
