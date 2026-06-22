@@ -109,6 +109,38 @@ export class ThreadsService {
     return this.prisma.thread.update({ where: { id }, data: dto });
   }
 
+  async lockThread(id: string) {
+    await this.findOne(id);
+    return this.prisma.thread.update({
+      where: { id },
+      data: { isLocked: true },
+    });
+  }
+
+  async unlockThread(id: string) {
+    await this.findOne(id);
+    return this.prisma.thread.update({
+      where: { id },
+      data: { isLocked: false },
+    });
+  }
+
+  async stickyThread(id: string) {
+    const thread = await this.findOne(id);
+    return this.prisma.thread.update({
+      where: { id },
+      data: { isSticky: !thread.isSticky },
+    });
+  }
+
+  async archiveThread(id: string) {
+    await this.findOne(id);
+    return this.prisma.thread.update({
+      where: { id },
+      data: { isLocked: true },
+    });
+  }
+
   async remove(id: string) {
     await this.findOne(id);
     return this.prisma.thread.delete({ where: { id } });

@@ -45,6 +45,26 @@ export class ModerationService {
     });
   }
 
+  async getReports(status?: string, page = 1, limit = 50) {
+    const skip = (page - 1) * limit;
+    const where =
+      status === "resolved"
+        ? { isResolved: true }
+        : status === "pending"
+          ? { isResolved: false }
+          : undefined;
+    const [reports, total] = await Promise.all([
+      this.prisma.report.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      this.prisma.report.count({ where }),
+    ]);
+    return { reports, total, page, limit };
+  }
+
   async resolveReport(id: string, dto: ResolveReportDto, userId: string) {
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException("Report not found");
@@ -73,7 +93,7 @@ export class ModerationService {
   }
 
   async findBans(active?: boolean) {
-    const where: any = {};
+    const where: { isActive?: boolean } = {};
     if (active !== undefined) {
       where.isActive = active;
     }
@@ -82,6 +102,10 @@ export class ModerationService {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+  }
+
+  async unbanUser(id: string) {
+    return this.revokeBan(id);
   }
 
   async revokeBan(id: string) {
@@ -127,11 +151,18 @@ export class ModerationService {
   async resolveAppeal(id: string, dto: ResolveAppealDto) {
     const ban = await this.prisma.ban.findUnique({ where: { id } });
     if (!ban) throw new NotFoundException("Ban not found");
-    const data: any = { appealStatus: dto.appealStatus };
+    const data: { appealStatus: typeof dto.appealStatus; isActive?: boolean } =
+      {
+        appealStatus: dto.appealStatus,
+      };
     if (dto.appealStatus === AppealStatus.APPROVED) {
       data.isActive = false;
     }
     return this.prisma.ban.update({ where: { id }, data });
+  }
+
+  async getModLog(page = 1) {
+    return this.getAuditLog(page, 50);
   }
 
   // --- Word Filters ---

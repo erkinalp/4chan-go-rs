@@ -2,7 +2,7 @@ import {
   Controller,
   Get,
   Post,
-  Put,
+  Patch,
   Delete,
   Param,
   Body,
@@ -58,13 +58,49 @@ export class ThreadsController {
     return this.threadsService.create(dto, ip);
   }
 
-  @Put("threads/:id")
+  @Patch("threads/:id")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.MODERATOR, Role.ADMIN)
   @ApiOperation({ summary: "Update thread properties (mod/admin)" })
   update(@Param("id") id: string, @Body() dto: UpdateThreadDto) {
     return this.threadsService.update(id, dto);
+  }
+
+  @Patch("threads/:id/lock")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.MODERATOR, Role.ADMIN)
+  @ApiOperation({ summary: "Toggle thread lock" })
+  lock(@Param("id") id: string) {
+    return this.threadsService.lockThread(id);
+  }
+
+  @Patch("threads/:id/unlock")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.MODERATOR, Role.ADMIN)
+  @ApiOperation({ summary: "Unlock a thread" })
+  unlock(@Param("id") id: string) {
+    return this.threadsService.unlockThread(id);
+  }
+
+  @Patch("threads/:id/sticky")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.MODERATOR, Role.ADMIN)
+  @ApiOperation({ summary: "Toggle thread sticky" })
+  sticky(@Param("id") id: string) {
+    return this.threadsService.stickyThread(id);
+  }
+
+  @Patch("threads/:id/archive")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.MODERATOR, Role.ADMIN)
+  @ApiOperation({ summary: "Archive a thread" })
+  archive(@Param("id") id: string) {
+    return this.threadsService.archiveThread(id);
   }
 
   @Delete("threads/:id")
