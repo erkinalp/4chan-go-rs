@@ -31,6 +31,20 @@ export class PostsController {
     return this.postsService.create(threadId, dto, ip);
   }
 
+  @Get("threads/:threadId/posts")
+  @ApiOperation({ summary: "Get posts for a thread (paginated)" })
+  getPostsByThread(
+    @Param("threadId") threadId: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.postsService.getPostsByThread(
+      threadId,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 100,
+    );
+  }
+
   @Get("posts/:id")
   @ApiOperation({ summary: "Get a single post by ID" })
   findOne(@Param("id") id: string) {

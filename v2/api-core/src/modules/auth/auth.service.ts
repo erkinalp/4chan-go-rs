@@ -1,7 +1,12 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as argon2 from "argon2";
+import { createHmac, randomBytes } from "crypto";
 import { PrismaService } from "../../services/prisma/prisma.service";
 
 @Injectable()
@@ -77,5 +82,84 @@ export class AuthService {
       data: { username, email, passwordHash },
     });
     return { id: user.id, username: user.username, role: user.role };
+  }
+
+  async enable2FA(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException("User not found");
+    if (user.twoFactorAuth) {
+      throw new BadRequestException("2FA is already enabled");
+    }
+
+    const secret = randomBytes(20).toString("hex");
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: secret },
+    });
+
+    const otpauthUrl = `otpauth://totp/4chan:${user.email}?secret=${this.hexToBase32(secret)}&issuer=4chan`;
+    return { secret: this.hexToBase32(secret), otpauthUrl };
+  }
+
+  async verify2FA(userId: string, code: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.twoFactorSecret) {
+      throw new BadRequestException("2FA not set up");
+    }
+
+    const isValid = this.verifyTOTP(user.twoFactorSecret, code);
+    if (!isValid) {
+      throw new BadRequestException("Invalid 2FA code");
+    }
+
+    if (!user.twoFactorAuth) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { twoFactorAuth: true },
+      });
+    }
+
+    return { verified: true };
+  }
+
+  private verifyTOTP(hexSecret: string, code: string): boolean {
+    const timeStep = 30;
+    const now = Math.floor(Date.now() / 1000);
+    for (const offset of [-1, 0, 1]) {
+      const counter = Math.floor(now / timeStep + offset);
+      const counterBuf = Buffer.alloc(8);
+      counterBuf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+      counterBuf.writeUInt32BE(counter >>> 0, 4);
+
+      const hmac = createHmac("sha1", Buffer.from(hexSecret, "hex"));
+      hmac.update(counterBuf);
+      const hash = hmac.digest();
+
+      const offset2 = hash[hash.length - 1] & 0x0f;
+      const truncated =
+        ((hash[offset2] & 0x7f) << 24) |
+        ((hash[offset2 + 1] & 0xff) << 16) |
+        ((hash[offset2 + 2] & 0xff) << 8) |
+        (hash[offset2 + 3] & 0xff);
+
+      const otp = (truncated % 1000000).toString().padStart(6, "0");
+      if (otp === code) return true;
+    }
+    return false;
+  }
+
+  private hexToBase32(hex: string): string {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    const bytes = Buffer.from(hex, "hex");
+    let bits = "";
+    for (const byte of bytes) {
+      bits += byte.toString(2).padStart(8, "0");
+    }
+    let result = "";
+    for (let i = 0; i < bits.length; i += 5) {
+      const chunk = bits.slice(i, i + 5).padEnd(5, "0");
+      result += alphabet[parseInt(chunk, 2)];
+    }
+    return result;
   }
 }

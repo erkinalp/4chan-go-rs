@@ -6,8 +6,16 @@ import {
   Param,
   Body,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
+import { FileInterceptor } from "@nestjs/platform-express";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiConsumes,
+} from "@nestjs/swagger";
 import { FilesService } from "./files.service";
 import { FileMetadataDto } from "./files.dto";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -18,6 +26,18 @@ import { Role } from "@prisma/client";
 @Controller("files")
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
+
+  @Post("upload")
+  @ApiConsumes("multipart/form-data")
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiOperation({ summary: "Upload a file (proxied to file-service)" })
+  upload(
+    @UploadedFile()
+    file: { buffer: Buffer; originalname: string; mimetype: string },
+    @Body("postId") postId: string,
+  ) {
+    return this.filesService.uploadFile(file, postId);
+  }
 
   @Post("metadata")
   @ApiBearerAuth()
