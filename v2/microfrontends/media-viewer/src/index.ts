@@ -4,20 +4,23 @@ import { customElement, property, state } from 'lit/decorators.js';
 @customElement('media-viewer')
 export class MediaViewer extends LitElement {
   @property({ type: String }) mediaId = '';
-  @property({ type: String }) mediaType = 'image'; // image, video, etc.
+  @property({ type: String }) mediaType = 'image';
   @property({ type: String }) mediaUrl = '';
+  @property({ type: String }) filename = '';
+  @property({ type: Array }) gallery: string[] = [];
   @state() private isFullscreen = false;
   @state() private isLoading = true;
+  @state() private scale = 1;
+  @state() private currentIndex = 0;
 
   static styles = css`
     :host {
       display: block;
-      font-family: sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
     }
     .media-container {
       position: relative;
-      max-width: 100%;
-      background-color: #1a1a1a;
+      background: #1a1a1a;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -31,138 +34,186 @@ export class MediaViewer extends LitElement {
     img, video {
       max-width: 100%;
       max-height: 80vh;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      transition: transform 0.2s ease;
     }
-    .fullscreen {
+    .fullscreen-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: rgba(0, 0, 0, 0.9);
-      z-index: 1000;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .fullscreen-overlay img, .fullscreen-overlay video {
+      max-width: 90vw;
+      max-height: 90vh;
+      cursor: default;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      align-items: center;
+    }
+    button {
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    button:hover { background: #555; }
+    .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,0.5);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 1.2rem;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .fullscreen img, .fullscreen video {
-      max-width: 90vw;
-      max-height: 90vh;
-    }
-    .controls {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    button {
-      background-color: #333;
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #444;
+    .nav-prev { left: 16px; }
+    .nav-next { right: 16px; }
+    .info {
+      font-size: 0.75rem;
+      color: #888;
+      text-align: center;
+      margin-top: 8px;
     }
     .loading {
-      padding: 20px;
+      padding: 40px;
       text-align: center;
       color: #888;
-    }
-    .media-info {
-      margin-top: 10px;
-      font-size: 0.8em;
-      color: #888;
-      text-align: center;
     }
   `;
 
-  render() {
-    if (this.isLoading) {
-      return html`
-        <div class="loading">
-          Loading media...
-        </div>
-      `;
-    }
-
-    const containerClass = this.isFullscreen ? 'media-container fullscreen' : 'media-container';
-    
-    return html`
-      <div class=${containerClass}>
-        <div class="media-wrapper">
-          ${this._renderMedia()}
-          
-          <div class="controls">
-            <button @click=${this._toggleFullscreen}>
-              ${this.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            </button>
-            <button @click=${this._downloadMedia}>
-              Download
-            </button>
-          </div>
-          
-          <div class="media-info">
-            <p>File: ${this.mediaId} (${this.mediaType})</p>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   connectedCallback() {
     super.connectedCallback();
-    // Simulate loading media
-    setTimeout(() => {
-      this.isLoading = false;
-    }, 1000);
+    if (this.gallery.length > 0) {
+      const idx = this.gallery.indexOf(this.mediaUrl);
+      if (idx >= 0) this.currentIndex = idx;
+    }
+    this._onLoad();
   }
 
-  private _renderMedia() {
-    if (this.mediaType === 'video') {
-      return html`
-        <video controls @click=${this._toggleFullscreen}>
-          <source src=${this.mediaUrl || '#'} type="video/mp4">
-          Your browser does not support the video tag.
-        </video>
-      `;
+  private _onLoad() {
+    this.isLoading = false;
+  }
+
+  private _getCurrentUrl(): string {
+    if (this.gallery.length > 0) {
+      return this.gallery[this.currentIndex] ?? this.mediaUrl;
     }
-    
-    // Default to image
-    return html`
-      <img 
-        src=${this.mediaUrl || 'https://via.placeholder.com/800x600?text=Sample+Image'} 
-        alt="Media content"
-        @click=${this._toggleFullscreen}
-      />
-    `;
+    return this.mediaUrl;
   }
 
   private _toggleFullscreen() {
     this.isFullscreen = !this.isFullscreen;
-    
-    if (this.isFullscreen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    
-    // Dispatch event for the shell to handle
+    document.body.style.overflow = this.isFullscreen ? 'hidden' : '';
+    this.scale = 1;
     this.dispatchEvent(new CustomEvent('fullscreen-change', {
       detail: { isFullscreen: this.isFullscreen },
-      bubbles: true,
-      composed: true
+      bubbles: true, composed: true,
     }));
   }
-  
-  private _downloadMedia() {
-    // In a real implementation, this would trigger a download
-    window.open(this.mediaUrl, '_blank');
+
+  private _zoomIn() { this.scale = Math.min(this.scale * 1.25, 5); }
+  private _zoomOut() { this.scale = Math.max(this.scale / 1.25, 0.25); }
+  private _resetZoom() { this.scale = 1; }
+
+  private _prev() {
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+      this.isLoading = true;
+    }
+  }
+
+  private _next() {
+    if (this.currentIndex < this.gallery.length - 1) {
+      this.currentIndex++;
+      this.isLoading = true;
+    }
+  }
+
+  private _download() {
+    const a = document.createElement('a');
+    a.href = this._getCurrentUrl();
+    a.download = this.filename || 'download';
+    a.click();
+  }
+
+  private _renderMedia(url: string) {
+    if (this.mediaType === 'video') {
+      return html`<video controls src=${url} @loadeddata=${this._onLoad}></video>`;
+    }
+    return html`<img src=${url} alt=${this.filename || 'Media'}
+      style="transform: scale(${this.scale})"
+      @load=${this._onLoad}
+      @click=${(e: Event) => e.stopPropagation()}>`;
+  }
+
+  render() {
+    const url = this._getCurrentUrl();
+
+    if (this.isFullscreen) {
+      return html`
+        <div class="fullscreen-overlay" @click=${this._toggleFullscreen}>
+          ${this._renderMedia(url)}
+          <button class="close-btn" @click=${this._toggleFullscreen}>&times;</button>
+          ${this.gallery.length > 1 ? html`
+            ${this.currentIndex > 0 ? html`
+              <button class="nav-btn nav-prev" @click=${(e: Event) => { e.stopPropagation(); this._prev(); }}>&lsaquo;</button>
+            ` : ''}
+            ${this.currentIndex < this.gallery.length - 1 ? html`
+              <button class="nav-btn nav-next" @click=${(e: Event) => { e.stopPropagation(); this._next(); }}>&rsaquo;</button>
+            ` : ''}
+          ` : ''}
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="media-container">
+        <div class="media-wrapper">
+          ${this.isLoading ? html`<div class="loading">Loading...</div>` : ''}
+          ${this._renderMedia(url)}
+          <div class="controls">
+            <button @click=${this._toggleFullscreen}>Fullscreen</button>
+            <button @click=${this._zoomIn}>+</button>
+            <button @click=${this._resetZoom}>1:1</button>
+            <button @click=${this._zoomOut}>-</button>
+            <button @click=${this._download}>Download</button>
+          </div>
+          <div class="info">${this.filename || this.mediaId}</div>
+        </div>
+      </div>
+    `;
   }
 }
 
-// Make sure the element is defined in the custom elements registry
 declare global {
   interface HTMLElementTagNameMap {
     'media-viewer': MediaViewer;

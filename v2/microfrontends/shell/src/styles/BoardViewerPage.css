@@ -1,0 +1,22 @@
+.board-viewer-page {
+  padding: 8px;
+}
+.board-title {
+  text-align: center;
+  color: #800000;
+  margin-bottom: 16px;
+}
+.board-loading {
+  text-align: center;
+  padding: 40px;
+}
+.board-error {
+  text-align: center;
+  padding: 40px;
+  color: #c00;
+}
+.reload-button {
+  margin-top: 12px;
+  padding: 6px 16px;
+  cursor: pointer;
+}
