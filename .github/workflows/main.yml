@@ -26,7 +26,7 @@ jobs:
       - name: Install frontend-modern dependencies
         run: |
           cd v2/frontend-modern
-          npm ci --legacy-peer-deps
+          npm install --legacy-peer-deps
 
       - name: Lint Backend
         run: |
@@ -143,12 +143,12 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: v2/frontend-modern/package-lock.json
+          cache-dependency-path: v2/api-core/package-lock.json
 
       - name: Install dependencies
         run: |
           cd v2/frontend-modern
-          npm ci --legacy-peer-deps
+          npm install --legacy-peer-deps
 
       - name: Run frontend tests
         run: |
@@ -222,7 +222,7 @@ jobs:
           cd v2/api-core
           npm ci --legacy-peer-deps --ignore-scripts
           cd ../frontend-modern
-          npm ci --legacy-peer-deps --ignore-scripts
+          npm install --legacy-peer-deps --ignore-scripts
 
       - name: Run npm audit (api-core)
         run: |
