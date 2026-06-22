@@ -1,6 +1,6 @@
+use config::{Config as ConfigLib, ConfigError, Environment, File};
 use serde::Deserialize;
 use std::env;
-use config::{Config as ConfigLib, ConfigError, Environment, File};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -96,7 +96,6 @@ pub struct MalwareScanner {
     pub timeout_ms: u64,
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct FileConfig {
     pub max_size: u64,
@@ -111,12 +110,12 @@ impl Config {
 
         let env = env::var("RUN_ENV").unwrap_or_else(|_| "development".into());
         let database_url = env::var("DATABASE_URL").ok();
-        
+
         let mut builder = ConfigLib::builder()
             .add_source(File::with_name("config/default").required(false))
             .add_source(File::with_name(&format!("config/{}", env)).required(false))
             .add_source(Environment::with_prefix("app").separator("__"));
-        
+
         if let Some(url) = database_url {
             builder = builder.set_override("database.connection_string", url)?;
         }
@@ -143,8 +142,9 @@ impl Default for Config {
                 keep_alive_seconds: 60,
             },
             database: DatabaseConfig {
-                connection_string: env::var("DATABASE_URL")
-                    .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/postgres".to_string()),
+                connection_string: env::var("DATABASE_URL").unwrap_or_else(|_| {
+                    "postgres://postgres:postgres@localhost:5432/postgres".to_string()
+                }),
                 max_connections: 25,
                 min_connections: 5,
                 max_lifetime_seconds: 1800,
@@ -155,17 +155,25 @@ impl Default for Config {
                 pool_max_size: 10,
             },
             s3: S3Config {
-                endpoint: env::var("MINIO_ENDPOINT").unwrap_or_else(|_| "s3.amazonaws.com".to_string()),
+                endpoint: env::var("MINIO_ENDPOINT")
+                    .unwrap_or_else(|_| "s3.amazonaws.com".to_string()),
                 region: env::var("MINIO_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
-                access_key: env::var("MINIO_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
-                secret_key: env::var("MINIO_SECRET_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
+                access_key: env::var("MINIO_ACCESS_KEY")
+                    .unwrap_or_else(|_| "minioadmin".to_string()),
+                secret_key: env::var("MINIO_SECRET_KEY")
+                    .unwrap_or_else(|_| "minioadmin".to_string()),
                 bucket: env::var("MINIO_BUCKET").unwrap_or_else(|_| "4chan-v2".to_string()),
-                use_ssl: env::var("MINIO_USE_SSL").unwrap_or_else(|_| "true".to_string()).parse().unwrap_or(true),
+                use_ssl: env::var("MINIO_USE_SSL")
+                    .unwrap_or_else(|_| "true".to_string())
+                    .parse()
+                    .unwrap_or(true),
             },
             jwt: JwtConfig {
-                secret: env::var("JWT_SECRET").unwrap_or_else(|_| "secure_jwt_secret_change_in_production".to_string()),
+                secret: env::var("JWT_SECRET")
+                    .unwrap_or_else(|_| "secure_jwt_secret_change_in_production".to_string()),
                 expiration_minutes: 60,
-                refresh_secret: env::var("JWT_REFRESH_SECRET").unwrap_or_else(|_| "secure_refresh_secret_change_in_production".to_string()),
+                refresh_secret: env::var("JWT_REFRESH_SECRET")
+                    .unwrap_or_else(|_| "secure_refresh_secret_change_in_production".to_string()),
                 refresh_expiration_days: 7,
                 issuer: "4chan-v2".to_string(),
             },
@@ -184,8 +192,14 @@ impl Default for Config {
             malware_scanner: MalwareScanner {
                 enabled: true,
                 host: env::var("CLAMAV_HOST").unwrap_or_else(|_| "clamav".to_string()),
-                port: env::var("CLAMAV_PORT").ok().and_then(|v| v.parse().ok()).unwrap_or(3310),
-                timeout_ms: env::var("CLAMAV_TIMEOUT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(5000),
+                port: env::var("CLAMAV_PORT")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(3310),
+                timeout_ms: env::var("CLAMAV_TIMEOUT_MS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(5000),
             },
             rate_limit: RateLimitConfig {
                 enabled: true,
@@ -196,7 +210,8 @@ impl Default for Config {
             },
             files: FileConfig {
                 max_size: 10485760,
-                allowed_types: "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm".to_string(),
+                allowed_types: "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm"
+                    .to_string(),
                 storage_path: "/tmp/uploads".to_string(),
             },
         }

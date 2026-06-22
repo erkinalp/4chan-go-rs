@@ -1,5 +1,5 @@
-use deadpool_redis::{redis, Config as RedisConfig, Pool};
 use anyhow::Result;
+use deadpool_redis::{redis, Config as RedisConfig, Pool};
 
 #[derive(Clone)]
 pub struct RedisRepository {

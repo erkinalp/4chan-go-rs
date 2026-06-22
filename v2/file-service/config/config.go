@@ -10,27 +10,27 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Environment   string               `mapstructure:"ENVIRONMENT"`
-	LogLevel      string               `mapstructure:"LOG_LEVEL"`
-	Server        ServerConfig         `mapstructure:",squash"`
-	Database      DatabaseConfig       `mapstructure:",squash"`
-	Redis         RedisConfig          `mapstructure:",squash"`
-	Minio         MinioConfig          `mapstructure:",squash"`
-	JWT           JWTConfig            `mapstructure:",squash"`
-	Captcha       CaptchaConfig        `mapstructure:",squash"`
-	CORS          CORSConfig           `mapstructure:",squash"`
-	RateLimit     RateLimitConfig      `mapstructure:",squash"`
+	Environment    string               `mapstructure:"ENVIRONMENT"`
+	LogLevel       string               `mapstructure:"LOG_LEVEL"`
+	Server         ServerConfig         `mapstructure:",squash"`
+	Database       DatabaseConfig       `mapstructure:",squash"`
+	Redis          RedisConfig          `mapstructure:",squash"`
+	Minio          MinioConfig          `mapstructure:",squash"`
+	JWT            JWTConfig            `mapstructure:",squash"`
+	Captcha        CaptchaConfig        `mapstructure:",squash"`
+	CORS           CORSConfig           `mapstructure:",squash"`
+	RateLimit      RateLimitConfig      `mapstructure:",squash"`
 	MalwareScanner MalwareScannerConfig `mapstructure:",squash"`
 }
 
 // ServerConfig holds server related configuration
 type ServerConfig struct {
-	Port               int    `mapstructure:"PORT"`
-	ReadTimeoutSeconds int    `mapstructure:"READ_TIMEOUT_SECONDS"`
-	WriteTimeoutSeconds int   `mapstructure:"WRITE_TIMEOUT_SECONDS"`
-	IdleTimeoutSeconds int    `mapstructure:"IDLE_TIMEOUT_SECONDS"`
-	APIPrefix          string `mapstructure:"API_PREFIX"`
-	APIVersion         string `mapstructure:"API_VERSION"`
+	Port                int    `mapstructure:"PORT"`
+	ReadTimeoutSeconds  int    `mapstructure:"READ_TIMEOUT_SECONDS"`
+	WriteTimeoutSeconds int    `mapstructure:"WRITE_TIMEOUT_SECONDS"`
+	IdleTimeoutSeconds  int    `mapstructure:"IDLE_TIMEOUT_SECONDS"`
+	APIPrefix           string `mapstructure:"API_PREFIX"`
+	APIVersion          string `mapstructure:"API_VERSION"`
 }
 
 // DatabaseConfig holds database related configuration

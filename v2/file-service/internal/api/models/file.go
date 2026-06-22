@@ -6,21 +6,21 @@ import (
 
 // File represents a file in the system
 type File struct {
-	ID           string    `json:"id"`
-	Filename     string    `json:"filename"`
-	StoredFilename string  `json:"storedFilename,omitempty"`
-	Filesize     int64     `json:"filesize"`
-	Width        int       `json:"width,omitempty"`
-	Height       int       `json:"height,omitempty"`
-	ThumbnailFilename string `json:"thumbnailFilename,omitempty"`
-	MimeType     string    `json:"mimeType"`
-	MD5Hash      string    `json:"md5Hash"`
-	SHA256Hash   string    `json:"sha256Hash,omitempty"`
-	IsSpoilered  bool      `json:"isSpoilered"`
-	CreatedAt    time.Time `json:"createdAt"`
-	PostID       string    `json:"postId,omitempty"`
-	FileURL      string    `json:"fileUrl"`
-	ThumbnailURL string    `json:"thumbnailUrl"`
+	ID                string    `json:"id"`
+	Filename          string    `json:"filename"`
+	StoredFilename    string    `json:"storedFilename,omitempty"`
+	Filesize          int64     `json:"filesize"`
+	Width             int       `json:"width,omitempty"`
+	Height            int       `json:"height,omitempty"`
+	ThumbnailFilename string    `json:"thumbnailFilename,omitempty"`
+	MimeType          string    `json:"mimeType"`
+	MD5Hash           string    `json:"md5Hash"`
+	SHA256Hash        string    `json:"sha256Hash,omitempty"`
+	IsSpoilered       bool      `json:"isSpoilered"`
+	CreatedAt         time.Time `json:"createdAt"`
+	PostID            string    `json:"postId,omitempty"`
+	FileURL           string    `json:"fileUrl"`
+	ThumbnailURL      string    `json:"thumbnailUrl"`
 }
 
 // FileUploadResponse represents the response after a successful file upload

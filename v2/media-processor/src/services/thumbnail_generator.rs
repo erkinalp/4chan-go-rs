@@ -1,6 +1,6 @@
-use image::{ImageFormat, DynamicImage, GenericImageView, imageops::FilterType};
+use anyhow::{Context, Result};
+use image::{imageops::FilterType, DynamicImage, GenericImageView, ImageFormat};
 use std::io::Cursor;
-use anyhow::{Result, Context};
 
 pub struct ThumbnailGenerator {
     pub small_size: (u32, u32),
@@ -11,7 +11,7 @@ pub struct ThumbnailGenerator {
 impl Default for ThumbnailGenerator {
     fn default() -> Self {
         Self {
-            small_size: (150, 150),
+            small_size: (250, 250),
             medium_size: (300, 300),
             large_size: (500, 500),
         }
@@ -28,8 +28,8 @@ impl ThumbnailGenerator {
     }
 
     pub fn generate_thumbnail(&self, image_data: &[u8], size: &str) -> Result<Vec<u8>> {
-        let img = image::load_from_memory(image_data)
-            .context("Failed to load image from memory")?;
+        let img =
+            image::load_from_memory(image_data).context("Failed to load image from memory")?;
 
         let target_size = match size {
             "small" => self.small_size,
@@ -39,19 +39,23 @@ impl ThumbnailGenerator {
         };
 
         let thumbnail = self.resize_image(&img, target_size)?;
-        
+
         let mut buffer = Vec::new();
         let mut cursor = Cursor::new(&mut buffer);
-        
-        thumbnail.write_to(&mut cursor, ImageFormat::Jpeg)
+
+        thumbnail
+            .write_to(&mut cursor, ImageFormat::Jpeg)
             .context("Failed to write thumbnail to buffer")?;
 
         Ok(buffer)
     }
 
-    pub fn generate_all_thumbnails(&self, image_data: &[u8]) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
-        let img = image::load_from_memory(image_data)
-            .context("Failed to load image from memory")?;
+    pub fn generate_all_thumbnails(
+        &self,
+        image_data: &[u8],
+    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+        let img =
+            image::load_from_memory(image_data).context("Failed to load image from memory")?;
 
         let small_thumb = self.resize_image(&img, self.small_size)?;
         let medium_thumb = self.resize_image(&img, self.medium_size)?;
@@ -94,7 +98,7 @@ impl ThumbnailGenerator {
     fn image_to_bytes(&self, img: &DynamicImage) -> Result<Vec<u8>> {
         let mut buffer = Vec::new();
         let mut cursor = Cursor::new(&mut buffer);
-        
+
         img.write_to(&mut cursor, ImageFormat::Jpeg)
             .context("Failed to write image to buffer")?;
 
@@ -124,9 +128,17 @@ mod tests {
     #[test]
     fn test_thumbnail_generator_creation() {
         let generator = ThumbnailGenerator::default();
-        assert_eq!(generator.small_size, (150, 150));
+        assert_eq!(generator.small_size, (250, 250));
         assert_eq!(generator.medium_size, (300, 300));
         assert_eq!(generator.large_size, (500, 500));
+    }
+
+    #[test]
+    fn test_custom_sizes() {
+        let generator = ThumbnailGenerator::new((100, 100), (200, 200), (400, 400));
+        assert_eq!(generator.small_size, (100, 100));
+        assert_eq!(generator.medium_size, (200, 200));
+        assert_eq!(generator.large_size, (400, 400));
     }
 
     #[test]
@@ -134,7 +146,58 @@ mod tests {
         let generator = ThumbnailGenerator::default();
         assert!(generator.is_image_format_supported("image/jpeg"));
         assert!(generator.is_image_format_supported("image/png"));
+        assert!(generator.is_image_format_supported("image/gif"));
+        assert!(generator.is_image_format_supported("image/webp"));
+        assert!(generator.is_image_format_supported("image/bmp"));
+        assert!(generator.is_image_format_supported("image/tiff"));
         assert!(!generator.is_image_format_supported("video/mp4"));
+        assert!(!generator.is_image_format_supported("application/pdf"));
+    }
+
+    #[test]
+    fn test_generate_thumbnail_valid_jpeg() {
+        let generator = ThumbnailGenerator::default();
+        // Create a simple 2x2 JPEG in memory
+        let img = image::RgbImage::from_fn(100, 100, |x, y| image::Rgb([x as u8, y as u8, 128]));
+        let mut buffer = Vec::new();
+        let mut cursor = Cursor::new(&mut buffer);
+        img.write_to(&mut cursor, ImageFormat::Jpeg).unwrap();
+
+        let result = generator.generate_thumbnail(&buffer, "small");
+        assert!(result.is_ok());
+        let thumb_data = result.unwrap();
+        assert!(!thumb_data.is_empty());
+    }
+
+    #[test]
+    fn test_generate_thumbnail_invalid_data() {
+        let generator = ThumbnailGenerator::default();
+        let result = generator.generate_thumbnail(b"not an image", "small");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_generate_video_thumbnail() {
+        let generator = ThumbnailGenerator::default();
+        let result = generator.generate_video_thumbnail(b"fake video data");
+        assert!(result.is_ok());
+        let data = result.unwrap();
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn test_generate_all_thumbnails() {
+        let generator = ThumbnailGenerator::default();
+        let img = image::RgbImage::from_fn(500, 400, |x, y| image::Rgb([x as u8, y as u8, 0]));
+        let mut buffer = Vec::new();
+        let mut cursor = Cursor::new(&mut buffer);
+        img.write_to(&mut cursor, ImageFormat::Jpeg).unwrap();
+
+        let result = generator.generate_all_thumbnails(&buffer);
+        assert!(result.is_ok());
+        let (small, medium, large) = result.unwrap();
+        assert!(!small.is_empty());
+        assert!(!medium.is_empty());
+        assert!(!large.is_empty());
     }
 }
-
