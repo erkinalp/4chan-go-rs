@@ -10,17 +10,19 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Environment   string               `mapstructure:"ENVIRONMENT"`
-	LogLevel      string               `mapstructure:"LOG_LEVEL"`
-	Server        ServerConfig         `mapstructure:",squash"`
-	Database      DatabaseConfig       `mapstructure:",squash"`
-	Redis         RedisConfig          `mapstructure:",squash"`
-	Minio         MinioConfig          `mapstructure:",squash"`
-	JWT           JWTConfig            `mapstructure:",squash"`
-	Captcha       CaptchaConfig        `mapstructure:",squash"`
-	CORS          CORSConfig           `mapstructure:",squash"`
-	RateLimit     RateLimitConfig      `mapstructure:",squash"`
-	MalwareScanner MalwareScannerConfig `mapstructure:",squash"`
+	Environment    string                `mapstructure:"ENVIRONMENT"`
+	LogLevel       string                `mapstructure:"LOG_LEVEL"`
+	Server         ServerConfig          `mapstructure:",squash"`
+	Database       DatabaseConfig        `mapstructure:",squash"`
+	Redis          RedisConfig           `mapstructure:",squash"`
+	Minio          MinioConfig           `mapstructure:",squash"`
+	JWT            JWTConfig             `mapstructure:",squash"`
+	GNAP           GNAPConfig            `mapstructure:",squash"`
+	Captcha        CaptchaConfig         `mapstructure:",squash"`
+	CORS           CORSConfig            `mapstructure:",squash"`
+	RateLimit      RateLimitConfig       `mapstructure:",squash"`
+	MalwareScanner MalwareScannerConfig  `mapstructure:",squash"`
+	MediaProcessor MediaProcessorConfig  `mapstructure:",squash"`
 }
 
 // ServerConfig holds server related configuration
@@ -97,6 +99,19 @@ type MalwareScannerConfig struct {
 	Port     int    `mapstructure:"CLAMAV_PORT"`
 }
 
+// GNAPConfig holds GNAP authentication configuration
+type GNAPConfig struct {
+	ServerURL    string `mapstructure:"GNAP_SERVER_URL"`
+	ClientKey    string `mapstructure:"GNAP_CLIENT_KEY"`
+	ClientSecret string `mapstructure:"GNAP_CLIENT_SECRET"`
+}
+
+// MediaProcessorConfig holds media processor service configuration
+type MediaProcessorConfig struct {
+	BaseURL string `mapstructure:"MEDIA_PROCESSOR_URL"`
+	Enabled bool   `mapstructure:"MEDIA_PROCESSOR_ENABLED"`
+}
+
 // Load reads configuration from files and environment variables
 func Load() (*Config, error) {
 	// Load .env file if it exists
@@ -131,6 +146,13 @@ func Load() (*Config, error) {
 	viper.SetDefault("MALWARE_SCANNER_FAIL_OPEN", false)
 	viper.SetDefault("CLAMAV_HOST", "clamav")
 	viper.SetDefault("CLAMAV_PORT", 3310)
+	// GNAP configuration defaults
+	viper.SetDefault("GNAP_SERVER_URL", "http://localhost:8081")
+	viper.SetDefault("GNAP_CLIENT_KEY", "")
+	viper.SetDefault("GNAP_CLIENT_SECRET", "")
+	// Media processor configuration defaults
+	viper.SetDefault("MEDIA_PROCESSOR_URL", "http://localhost:8082")
+	viper.SetDefault("MEDIA_PROCESSOR_ENABLED", true)
 
 	// Read configuration from environment variables
 	viper.AutomaticEnv()

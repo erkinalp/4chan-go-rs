@@ -121,10 +121,11 @@ type GNAPError struct {
 }
 
 type UserContext struct {
-	Sub         string   `json:"sub"`
-	Email       string   `json:"email,omitempty"`
-	Role        string   `json:"role,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
+	Sub         string    `json:"sub"`
+	Email       string    `json:"email,omitempty"`
+	Role        string    `json:"role,omitempty"`
+	Permissions []string  `json:"permissions,omitempty"`
+	CreatedAt   time.Time `json:"created_at,omitempty"`
 }
 
 func NewGNAPClient(serverURL, clientKey, clientSecret string) *GNAPClient {

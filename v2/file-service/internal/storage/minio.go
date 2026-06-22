@@ -32,6 +32,16 @@ type FileInfo struct {
 	ThumbnailURL string
 }
 
+// ThumbnailInfo contains information about stored thumbnails
+type ThumbnailInfo struct {
+	SmallPath  string
+	MediumPath string
+	LargePath  string
+	SmallURL   string
+	MediumURL  string
+	LargeURL   string
+}
+
 // NewMinioClient creates a new MinIO client
 func NewMinioClient(cfg config.MinioConfig) (*MinioClient, error) {
 	// Create MinIO client
@@ -132,12 +142,84 @@ func (m *MinioClient) UploadFile(ctx context.Context, fileData []byte, fileName,
 	}, nil
 }
 
-// GenerateThumbnail creates a thumbnail for an image
-// In a real application, you would implement actual thumbnail generation
-func (m *MinioClient) GenerateThumbnail(ctx context.Context, fileData []byte, fileName, contentType string) ([]byte, error) {
-	// In a real application, you would use an image processing library
-	// to resize the image and create a thumbnail
-	return fileData, nil
+// UploadThumbnail uploads a thumbnail to storage with proper naming convention
+func (m *MinioClient) UploadThumbnail(ctx context.Context, thumbnailData []byte, originalFileName, size string) (string, string, error) {
+	thumbnailFileName := fmt.Sprintf("thumb_%s_%s.jpg", size, originalFileName)
+	
+	_, err := m.client.PutObject(
+		ctx,
+		m.bucketName,
+		thumbnailFileName,
+		bytes.NewReader(thumbnailData),
+		int64(len(thumbnailData)),
+		minio.PutObjectOptions{
+			ContentType: "image/jpeg",
+			UserMetadata: map[string]string{
+				"thumbnail_size": size,
+				"original_file":  originalFileName,
+			},
+		},
+	)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to upload thumbnail: %w", err)
+	}
+
+	presignedURL, err := m.client.PresignedGetObject(
+		ctx,
+		m.bucketName,
+		thumbnailFileName,
+		time.Hour*24*7,
+		url.Values{},
+	)
+	if err != nil {
+		return thumbnailFileName, "", fmt.Errorf("failed to generate thumbnail URL: %w", err)
+	}
+
+	return thumbnailFileName, presignedURL.String(), nil
+}
+
+// UploadAllThumbnails uploads small, medium, and large thumbnails
+func (m *MinioClient) UploadAllThumbnails(ctx context.Context, smallData, mediumData, largeData []byte, originalFileName string) (*ThumbnailInfo, error) {
+	info := &ThumbnailInfo{}
+
+	smallPath, smallURL, err := m.UploadThumbnail(ctx, smallData, originalFileName, "small")
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload small thumbnail: %w", err)
+	}
+	info.SmallPath = smallPath
+	info.SmallURL = smallURL
+
+	mediumPath, mediumURL, err := m.UploadThumbnail(ctx, mediumData, originalFileName, "medium")
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload medium thumbnail: %w", err)
+	}
+	info.MediumPath = mediumPath
+	info.MediumURL = mediumURL
+
+	largePath, largeURL, err := m.UploadThumbnail(ctx, largeData, originalFileName, "large")
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload large thumbnail: %w", err)
+	}
+	info.LargePath = largePath
+	info.LargeURL = largeURL
+
+	return info, nil
+}
+
+// GetThumbnail retrieves a thumbnail from storage
+func (m *MinioClient) GetThumbnail(ctx context.Context, originalFileName, size string) ([]byte, error) {
+	thumbnailFileName := fmt.Sprintf("thumb_%s_%s.jpg", size, originalFileName)
+	return m.GetFile(ctx, thumbnailFileName)
+}
+
+// DeleteThumbnails deletes all thumbnails for a file
+func (m *MinioClient) DeleteThumbnails(ctx context.Context, originalFileName string) error {
+	sizes := []string{"small", "medium", "large"}
+	for _, size := range sizes {
+		thumbnailFileName := fmt.Sprintf("thumb_%s_%s.jpg", size, originalFileName)
+		_ = m.client.RemoveObject(ctx, m.bucketName, thumbnailFileName, minio.RemoveObjectOptions{})
+	}
+	return nil
 }
 
 // DeleteFile deletes a file from storage
