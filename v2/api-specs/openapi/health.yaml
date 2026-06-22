@@ -1,0 +1,71 @@
+openapi: 3.0.3
+info:
+  title: 4chan v2 API - Health
+  version: 1.0.0
+  description: Health check endpoint for monitoring service status.
+
+paths:
+  /health:
+    get:
+      operationId: healthCheck
+      summary: System health check
+      description: |
+        Returns the current health status of the API and its dependencies.
+        Used by load balancers, monitoring systems, and deployment orchestration.
+      tags:
+        - health
+      responses:
+        '200':
+          description: System healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded]
+                    example: ok
+                  version:
+                    type: string
+                    example: 2.0.0
+                  uptime:
+                    type: number
+                    description: Uptime in seconds
+                    example: 86400
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [healthy, unhealthy]
+                        example: healthy
+                      redis:
+                        type: string
+                        enum: [healthy, unhealthy]
+                        example: healthy
+                      s3:
+                        type: string
+                        enum: [healthy, unhealthy]
+                        example: healthy
+        '503':
+          description: Service unavailable (critical dependency down)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                      redis:
+                        type: string
+                      s3:
+                        type: string
