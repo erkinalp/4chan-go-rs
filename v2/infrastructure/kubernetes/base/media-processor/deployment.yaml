@@ -1,45 +1,58 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth
+  name: media-processor
   namespace: 4chan-v2
   labels:
-    app: auth
+    app: media-processor
     component: backend
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: auth
+      app: media-processor
   template:
     metadata:
       labels:
-        app: auth
+        app: media-processor
         component: backend
     spec:
       containers:
-      - name: auth
-        image: 4chan-auth:latest
+      - name: media-processor
+        image: 4chan-media-processor:latest
         ports:
         - containerPort: 8081
         env:
-        - name: DATABASE_URL
+        - name: APP_SERVER__HOST
+          value: "0.0.0.0"
+        - name: APP_SERVER__PORT
+          value: "8081"
+        - name: APP_DATABASE__URL
           valueFrom:
             secretKeyRef:
               name: database-secret
               key: connection-string
-        - name: JWT_SECRET
+        - name: APP_REDIS__HOST
+          value: "redis-service"
+        - name: APP_REDIS__PORT
+          value: "6379"
+        - name: APP_JWT__SECRET
           valueFrom:
             secretKeyRef:
               name: jwt-secret
               key: secret
-        - name: JWT_REFRESH_SECRET
+        - name: APP_S3__ENDPOINT
+          value: "http://minio-service:9000"
+        - name: APP_S3__ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              name: jwt-secret
-              key: refresh-secret
-        - name: REDIS_URL
-          value: "redis://redis-service:6379"
+              name: minio-secret
+              key: access-key
+        - name: APP_S3__SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: secret-key
         resources:
           requests:
             memory: "256Mi"
