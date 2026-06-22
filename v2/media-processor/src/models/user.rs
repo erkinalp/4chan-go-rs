@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
+use sqlx::FromRow;
 use uuid::Uuid;
-use secrecy::{Secret, ExposeSecret};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "role", rename_all = "UPPERCASE")]
@@ -24,13 +24,28 @@ impl std::fmt::Display for Role {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+impl TryFrom<String> for Role {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.to_uppercase().as_str() {
+            "USER" => Ok(Role::User),
+            "JANITOR" => Ok(Role::Janitor),
+            "MODERATOR" => Ok(Role::Moderator),
+            "ADMIN" => Ok(Role::Admin),
+            _ => Err(format!("Unknown role: {}", s)),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
     pub email: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
+    #[sqlx(try_from = "String")]
     pub role: Role,
     pub is_active: bool,
     pub is_banned: bool,
@@ -102,7 +117,7 @@ pub struct RefreshTokenRequest {
     pub refresh_token: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct RefreshToken {
     pub id: Uuid,
     pub token: String,
@@ -113,15 +128,14 @@ pub struct RefreshToken {
 
 impl User {
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            User,
+        sqlx::query_as::<_, User>(
             r#"
             SELECT 
                 id,
                 username,
                 email,
                 password_hash,
-                role as "role: Role",
+                role::text as role,
                 is_active,
                 is_banned,
                 two_factor_auth,
@@ -132,22 +146,24 @@ impl User {
             FROM users
             WHERE id = $1
             "#,
-            id
         )
+        .bind(id)
         .fetch_optional(pool)
         .await
     }
 
-    pub async fn find_by_username(pool: &PgPool, username: &str) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            User,
+    pub async fn find_by_username(
+        pool: &PgPool,
+        username: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, User>(
             r#"
             SELECT 
                 id,
                 username,
                 email,
                 password_hash,
-                role as "role: Role",
+                role::text as role,
                 is_active,
                 is_banned,
                 two_factor_auth,
@@ -158,15 +174,18 @@ impl User {
             FROM users
             WHERE username = $1
             "#,
-            username
         )
+        .bind(username)
         .fetch_optional(pool)
         .await
     }
 
-    pub async fn create(pool: &PgPool, user: CreateUserDto, password_hash: String) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            User,
+    pub async fn create(
+        pool: &PgPool,
+        user: CreateUserDto,
+        password_hash: String,
+    ) -> Result<Self, sqlx::Error> {
+        sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (
                 username,
@@ -174,13 +193,13 @@ impl User {
                 password_hash,
                 role
             )
-            VALUES ($1, $2, $3, $4)
+            VALUES ($1, $2, $3, $4::role)
             RETURNING 
                 id,
                 username,
                 email,
                 password_hash,
-                role as "role: Role",
+                role::text as role,
                 is_active,
                 is_banned,
                 two_factor_auth,
@@ -189,24 +208,24 @@ impl User {
                 updated_at,
                 last_login_at
             "#,
-            user.username,
-            user.email,
-            password_hash,
-            user.role as Role
         )
+        .bind(&user.username)
+        .bind(&user.email)
+        .bind(&password_hash)
+        .bind(user.role.to_string())
         .fetch_one(pool)
         .await
     }
 
     pub async fn update_last_login(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE users
             SET last_login_at = NOW(), updated_at = NOW()
             WHERE id = $1
             "#,
-            id
         )
+        .bind(id)
         .execute(pool)
         .await?;
 
@@ -215,9 +234,13 @@ impl User {
 }
 
 impl RefreshToken {
-    pub async fn create(pool: &PgPool, user_id: Uuid, token: String, expiry: DateTime<Utc>) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            RefreshToken,
+    pub async fn create(
+        pool: &PgPool,
+        user_id: Uuid,
+        token: String,
+        expiry: DateTime<Utc>,
+    ) -> Result<Self, sqlx::Error> {
+        sqlx::query_as::<_, RefreshToken>(
             r#"
             INSERT INTO refresh_tokens (
                 user_id,
@@ -227,36 +250,35 @@ impl RefreshToken {
             VALUES ($1, $2, $3)
             RETURNING id, token, user_id, expires_at, created_at
             "#,
-            user_id,
-            token,
-            expiry
         )
+        .bind(user_id)
+        .bind(&token)
+        .bind(expiry)
         .fetch_one(pool)
         .await
     }
 
     pub async fn find_by_token(pool: &PgPool, token: &str) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            RefreshToken,
+        sqlx::query_as::<_, RefreshToken>(
             r#"
             SELECT id, token, user_id, expires_at, created_at
             FROM refresh_tokens
             WHERE token = $1 AND expires_at > NOW()
             "#,
-            token
         )
+        .bind(token)
         .fetch_optional(pool)
         .await
     }
 
     pub async fn delete(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             DELETE FROM refresh_tokens
             WHERE id = $1
             "#,
-            id
         )
+        .bind(id)
         .execute(pool)
         .await?;
 
@@ -264,13 +286,13 @@ impl RefreshToken {
     }
 
     pub async fn delete_all_for_user(pool: &PgPool, user_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             DELETE FROM refresh_tokens
             WHERE user_id = $1
             "#,
-            user_id
         )
+        .bind(user_id)
         .execute(pool)
         .await?;
 

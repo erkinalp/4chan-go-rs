@@ -7,7 +7,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/{board_id}", web::get().to(get_board))
             .route("", web::post().to(create_board))
             .route("/{board_id}", web::put().to(update_board))
-            .route("/{board_id}", web::delete().to(delete_board))
+            .route("/{board_id}", web::delete().to(delete_board)),
     );
 }
 

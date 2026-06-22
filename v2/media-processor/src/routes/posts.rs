@@ -8,7 +8,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("", web::post().to(create_post))
             .route("/{post_id}", web::put().to(update_post))
             .route("/{post_id}", web::delete().to(delete_post))
-            .route("/{post_id}/report", web::post().to(report_post))
+            .route("/{post_id}/report", web::post().to(report_post)),
     );
 }
 

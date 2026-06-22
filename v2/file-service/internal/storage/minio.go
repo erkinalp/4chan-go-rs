@@ -84,11 +84,11 @@ func (m *MinioClient) UploadFile(ctx context.Context, fileData []byte, fileName,
 	// Generate unique file name
 	timestamp := time.Now().Unix()
 	uniqueFileName := fmt.Sprintf("%d_%s", timestamp, fileName)
-	
+
 	// Calculate MD5 hash
 	hash := md5.Sum(fileData)
 	md5Hash := hex.EncodeToString(hash[:])
-	
+
 	// Upload file
 	_, err := m.client.PutObject(
 		ctx,
@@ -106,7 +106,7 @@ func (m *MinioClient) UploadFile(ctx context.Context, fileData []byte, fileName,
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
-	
+
 	// Generate URL
 	presignedURL, err := m.client.PresignedGetObject(
 		ctx,
@@ -118,10 +118,10 @@ func (m *MinioClient) UploadFile(ctx context.Context, fileData []byte, fileName,
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate URL: %w", err)
 	}
-	
+
 	// For this example, we'll assume thumbnails have the same URL
 	// In a real application, you would generate a separate thumbnail
-	
+
 	return &FileInfo{
 		FileName:     uniqueFileName,
 		ContentType:  contentType,
@@ -146,11 +146,11 @@ func (m *MinioClient) DeleteFile(ctx context.Context, fileName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
-	
+
 	// Also delete thumbnail if it exists
 	thumbnailName := "thumb_" + fileName
 	_ = m.client.RemoveObject(ctx, m.bucketName, thumbnailName, minio.RemoveObjectOptions{})
-	
+
 	return nil
 }
 
@@ -161,7 +161,7 @@ func (m *MinioClient) GetFile(ctx context.Context, fileName string) ([]byte, err
 		return nil, fmt.Errorf("failed to get file: %w", err)
 	}
 	defer object.Close()
-	
+
 	return io.ReadAll(object)
 }
 
@@ -177,8 +177,38 @@ func (m *MinioClient) GetFileURL(ctx context.Context, fileName string, expiry ti
 	if err != nil {
 		return "", fmt.Errorf("failed to generate URL: %w", err)
 	}
-	
+
 	return presignedURL.String(), nil
+}
+
+// GeneratePresignedURL generates a presigned URL for downloading a file
+func (m *MinioClient) GeneratePresignedURL(ctx context.Context, fileName string, expiry time.Duration) (string, error) {
+	return m.GetFileURL(ctx, fileName, expiry)
+}
+
+// PutObject uploads raw bytes to a specific key in the bucket
+func (m *MinioClient) PutObject(ctx context.Context, key string, data []byte, contentType string) error {
+	_, err := m.client.PutObject(
+		ctx,
+		m.bucketName,
+		key,
+		bytes.NewReader(data),
+		int64(len(data)),
+		minio.PutObjectOptions{
+			ContentType: contentType,
+		},
+	)
+	return err
+}
+
+// GetObject retrieves raw bytes from a specific key in the bucket
+func (m *MinioClient) GetObject(ctx context.Context, key string) ([]byte, error) {
+	return m.GetFile(ctx, key)
+}
+
+// DeleteObject removes an object by key from the bucket
+func (m *MinioClient) DeleteObject(ctx context.Context, key string) error {
+	return m.client.RemoveObject(ctx, m.bucketName, key, minio.RemoveObjectOptions{})
 }
 
 // IsImage checks if the file is an image based on its extension

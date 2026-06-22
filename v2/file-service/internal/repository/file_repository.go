@@ -138,6 +138,52 @@ func (r *FileRepository) DeleteFile(ctx context.Context, fileID string) error {
 	return err
 }
 
+func (r *FileRepository) GetFilesByPostID(ctx context.Context, postID string) ([]models.File, error) {
+	query := `
+		SELECT id, filename, stored_filename, filesize, width, height, 
+		       thumbnail_filename, mime_type, md5_hash, sha256_hash, 
+		       is_spoilered, created_at, post_id
+		FROM files
+		WHERE post_id = $1
+		ORDER BY created_at ASC
+	`
+
+	rows, err := r.db.GetPool().Query(ctx, query, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var files []models.File
+	for rows.Next() {
+		var file models.File
+		if err := rows.Scan(
+			&file.ID,
+			&file.Filename,
+			&file.StoredFilename,
+			&file.Filesize,
+			&file.Width,
+			&file.Height,
+			&file.ThumbnailFilename,
+			&file.MimeType,
+			&file.MD5Hash,
+			&file.SHA256Hash,
+			&file.IsSpoilered,
+			&file.CreatedAt,
+			&file.PostID,
+		); err != nil {
+			return nil, err
+		}
+		files = append(files, file)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
 func (r *FileRepository) GetBannedHashes(ctx context.Context) ([]string, error) {
 	query := `
 		SELECT md5_hash

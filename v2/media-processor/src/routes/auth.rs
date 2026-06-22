@@ -146,7 +146,10 @@ impl GNAPClient {
         }
     }
 
-    pub async fn request_grant(&self, request: &GNAPGrantRequest) -> Result<GNAPGrantResponse, Box<dyn std::error::Error>> {
+    pub async fn request_grant(
+        &self,
+        request: &GNAPGrantRequest,
+    ) -> Result<GNAPGrantResponse, Box<dyn std::error::Error>> {
         let response = self
             .http_client
             .post(&format!("{}/gnap", self.server_url))
@@ -159,7 +162,10 @@ impl GNAPClient {
         Ok(grant_response)
     }
 
-    pub async fn validate_token(&self, token: &str) -> Result<UserContext, Box<dyn std::error::Error>> {
+    pub async fn validate_token(
+        &self,
+        token: &str,
+    ) -> Result<UserContext, Box<dyn std::error::Error>> {
         if token.is_empty() {
             return Err("Empty token".into());
         }
@@ -172,7 +178,9 @@ impl GNAPClient {
             .await?;
 
         if response.status() != 200 {
-            return Err(format!("Token validation failed with status: {}", response.status()).into());
+            return Err(
+                format!("Token validation failed with status: {}", response.status()).into(),
+            );
         }
 
         let user_context: UserContext = response.json().await?;
@@ -185,7 +193,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/auth")
             .route("/grant", web::post().to(request_grant))
             .route("/continue", web::post().to(continue_grant))
-            .route("/introspect", web::post().to(introspect_token))
+            .route("/introspect", web::post().to(introspect_token)),
     );
 }
 
@@ -219,7 +227,7 @@ async fn introspect_token(req: HttpRequest) -> HttpResponse {
 
     let auth_str = auth_header.unwrap().to_str().unwrap_or("");
     let token_parts: Vec<&str> = auth_str.split(' ').collect();
-    
+
     if token_parts.len() != 2 || token_parts[0] != "Bearer" {
         return HttpResponse::Unauthorized().json(serde_json::json!({
             "error": "invalid_authorization_format"

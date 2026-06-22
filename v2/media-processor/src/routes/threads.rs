@@ -7,7 +7,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/{thread_id}", web::get().to(get_thread))
             .route("", web::post().to(create_thread))
             .route("/{thread_id}", web::put().to(update_thread))
-            .route("/{thread_id}", web::delete().to(delete_thread))
+            .route("/{thread_id}", web::delete().to(delete_thread)),
     );
 }
 
