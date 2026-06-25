@@ -1,184 +1,255 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-@customElement('moderation-tools')
-export class ModerationTools extends LitElement {
-  @property({ type: String }) activeTab = 'reports';
-  @state() private reports = [
-    { id: 1, boardId: 'b', threadId: 12345, postId: 67890, reason: 'Spam', status: 'pending' },
-    { id: 2, boardId: 'a', threadId: 54321, postId: 98765, reason: 'Offensive content', status: 'pending' },
-    { id: 3, boardId: 'g', threadId: 13579, postId: 24680, reason: 'Off-topic', status: 'resolved' },
-  ];
-  @state() private bans = [
-    { id: 1, ip: '192.168.1.x', boardId: 'all', reason: 'Spam', expires: '2025-05-17', status: 'active' },
-    { id: 2, ip: '10.0.0.x', boardId: 'b', reason: 'Trolling', expires: '2025-04-25', status: 'active' },
-    { id: 3, ip: '172.16.0.x', boardId: 'a', reason: 'Advertising', expires: '2025-04-19', status: 'expired' },
-  ];
+interface Report {
+  id: string;
+  boardId: string;
+  threadId: string;
+  postId: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+}
+
+interface Ban {
+  id: string;
+  ip: string;
+  boardId: string;
+  reason: string;
+  expires: string;
+  status: string;
+}
+
+interface ModLogEntry {
+  id: string;
+  action: string;
+  boardId: string;
+  performedBy: string;
+  createdAt: string;
+}
+
+@customElement('mod-panel')
+export class ModPanel extends LitElement {
+  @property({ type: String, attribute: 'api-base' }) apiBase = '/api/v1';
+  @property({ type: String, attribute: 'auth-token' }) authToken = '';
+  @state() private activeTab: 'reports' | 'bans' | 'log' = 'reports';
+  @state() private reports: Report[] = [];
+  @state() private bans: Ban[] = [];
+  @state() private modLog: ModLogEntry[] = [];
+  @state() private loading = true;
+  @state() private error = '';
+
+  @state() private banBoardId = '';
+  @state() private banIp = '';
+  @state() private banReason = '';
+  @state() private banDuration = 24;
+  @state() private showBanForm = false;
 
   static styles = css`
     :host {
       display: block;
-      font-family: sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
       padding: 16px;
     }
+    h2 { color: #800000; margin: 0 0 16px; }
     .tabs {
       display: flex;
-      border-bottom: 1px solid #ccc;
-      margin-bottom: 20px;
+      border-bottom: 2px solid #d9bfb7;
+      margin-bottom: 16px;
     }
     .tab {
-      padding: 10px 16px;
+      padding: 8px 16px;
       cursor: pointer;
-      border: 1px solid transparent;
-      border-bottom: none;
-      margin-right: 4px;
+      border: none;
+      background: transparent;
+      font-weight: bold;
+      color: #666;
+      font-size: 0.9rem;
     }
     .tab.active {
-      background-color: #f5f5f5;
-      border-color: #ccc;
-      border-radius: 4px 4px 0 0;
+      color: #800000;
+      border-bottom: 2px solid #800000;
+      margin-bottom: -2px;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      text-align: left;
-      padding: 8px 12px;
-      border-bottom: 1px solid #ddd;
-    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     th {
-      background-color: #f5f5f5;
-      font-weight: bold;
+      text-align: left;
+      padding: 6px 8px;
+      background: #f0e0d6;
+      border-bottom: 2px solid #d9bfb7;
     }
-    tr:hover {
-      background-color: #f9f9f9;
-    }
-    .actions {
-      display: flex;
-      gap: 8px;
-    }
-    button {
-      background-color: #4a4a4a;
-      color: white;
-      border: none;
-      padding: 6px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8em;
-    }
-    button:hover {
-      background-color: #333;
-    }
-    button.resolve {
-      background-color: #4caf50;
-    }
-    button.delete {
-      background-color: #f44336;
+    td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #d9bfb7;
     }
     .status {
       display: inline-block;
       padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.8em;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      color: #fff;
     }
-    .status.pending {
-      background-color: #ffeb3b;
-      color: #333;
+    .status-pending { background: #f39c12; }
+    .status-resolved { background: #27ae60; }
+    .status-dismissed { background: #95a5a6; }
+    .status-active { background: #e74c3c; }
+    .status-expired { background: #95a5a6; }
+    .actions { display: flex; gap: 4px; }
+    button.action {
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 2px;
+      color: #fff;
     }
-    .status.resolved {
-      background-color: #4caf50;
-      color: white;
+    .btn-resolve { background: #27ae60; }
+    .btn-dismiss { background: #95a5a6; }
+    .btn-delete { background: #e74c3c; }
+    .btn-lift { background: #e74c3c; }
+    .btn-primary { background: #800000; padding: 4px 12px; cursor: pointer; border: none; color: #fff; border-radius: 3px; }
+    .ban-form {
+      background: #f0e0d6;
+      border: 1px solid #d9bfb7;
+      padding: 16px;
+      margin-top: 12px;
+      max-width: 400px;
     }
-    .status.active {
-      background-color: #f44336;
-      color: white;
-    }
-    .status.expired {
-      background-color: #9e9e9e;
-      color: white;
-    }
+    .ban-form .field { margin-bottom: 8px; }
+    .ban-form label { display: block; font-weight: bold; font-size: 0.85rem; margin-bottom: 2px; }
+    .ban-form input, .ban-form select { width: 100%; padding: 4px 6px; border: 1px solid #aaa; box-sizing: border-box; }
+    .loading, .error { text-align: center; padding: 20px; }
+    .error { color: #c00; }
+    .empty { color: #707070; text-align: center; padding: 20px; }
   `;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._fetchData();
+  }
+
+  private _headers(): Record<string, string> {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.authToken) h['Authorization'] = `Bearer ${this.authToken}`;
+    return h;
+  }
+
+  private async _fetchData() {
+    this.loading = true;
+    this.error = '';
+    try {
+      const [reportsRes, bansRes, logRes] = await Promise.all([
+        fetch(`${this.apiBase}/mod/reports`, { headers: this._headers() }),
+        fetch(`${this.apiBase}/mod/bans`, { headers: this._headers() }),
+        fetch(`${this.apiBase}/mod/log`, { headers: this._headers() }),
+      ]);
+
+      if (reportsRes.ok) {
+        const d = await reportsRes.json();
+        this.reports = d.data ?? d;
+      }
+      if (bansRes.ok) {
+        const d = await bansRes.json();
+        this.bans = d.data ?? d;
+      }
+      if (logRes.ok) {
+        const d = await logRes.json();
+        this.modLog = d.data ?? d;
+      }
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'Failed to load';
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  private async _resolveReport(id: string, action: string) {
+    await fetch(`${this.apiBase}/mod/reports/${id}`, {
+      method: 'PATCH',
+      headers: this._headers(),
+      body: JSON.stringify({ action }),
+    });
+    this._fetchData();
+  }
+
+  private async _liftBan(id: string) {
+    await fetch(`${this.apiBase}/mod/bans/${id}`, {
+      method: 'DELETE',
+      headers: this._headers(),
+    });
+    this._fetchData();
+  }
+
+  private async _createBan() {
+    if (!this.banIp || !this.banReason) return;
+    await fetch(`${this.apiBase}/mod/bans`, {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({
+        ip: this.banIp,
+        boardId: this.banBoardId || 'all',
+        reason: this.banReason,
+        duration: this.banDuration,
+      }),
+    });
+    this.showBanForm = false;
+    this.banIp = '';
+    this.banReason = '';
+    this._fetchData();
+  }
+
+  private _formatDate(iso: string): string {
+    return new Date(iso).toLocaleString();
+  }
 
   render() {
     return html`
-      <div>
-        <h2>Moderation Tools</h2>
-        
-        <div class="tabs">
-          <div 
-            class="tab ${this.activeTab === 'reports' ? 'active' : ''}" 
-            @click=${() => this.activeTab = 'reports'}
-          >
-            Reports
-          </div>
-          <div 
-            class="tab ${this.activeTab === 'bans' ? 'active' : ''}" 
-            @click=${() => this.activeTab = 'bans'}
-          >
-            Bans
-          </div>
-          <div 
-            class="tab ${this.activeTab === 'settings' ? 'active' : ''}" 
-            @click=${() => this.activeTab = 'settings'}
-          >
-            Settings
-          </div>
-        </div>
-        
-        ${this._renderTabContent()}
+      <h2>Moderation Panel</h2>
+
+      <div class="tabs">
+        <button class="tab ${this.activeTab === 'reports' ? 'active' : ''}"
+          @click=${() => this.activeTab = 'reports'}>Reports</button>
+        <button class="tab ${this.activeTab === 'bans' ? 'active' : ''}"
+          @click=${() => this.activeTab = 'bans'}>Bans</button>
+        <button class="tab ${this.activeTab === 'log' ? 'active' : ''}"
+          @click=${() => this.activeTab = 'log'}>Mod Log</button>
       </div>
+
+      ${this.loading ? html`<div class="loading">Loading...</div>` : ''}
+      ${this.error ? html`<div class="error">${this.error}</div>` : ''}
+
+      ${!this.loading && !this.error ? this._renderTab() : ''}
     `;
   }
 
-  private _renderTabContent() {
+  private _renderTab() {
     switch (this.activeTab) {
-      case 'reports':
-        return this._renderReports();
-      case 'bans':
-        return this._renderBans();
-      case 'settings':
-        return this._renderSettings();
-      default:
-        return html`<p>Unknown tab</p>`;
+      case 'reports': return this._renderReports();
+      case 'bans': return this._renderBans();
+      case 'log': return this._renderLog();
     }
   }
 
   private _renderReports() {
+    if (this.reports.length === 0) return html`<div class="empty">No reports.</div>`;
     return html`
       <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Board</th>
-            <th>Thread</th>
-            <th>Post</th>
-            <th>Reason</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>ID</th><th>Board</th><th>Reason</th><th>Status</th><th>Date</th><th>Actions</th>
+        </tr></thead>
         <tbody>
-          ${this.reports.map(report => html`
+          ${this.reports.map(r => html`
             <tr>
-              <td>${report.id}</td>
-              <td>/${report.boardId}/</td>
-              <td><a href="#/thread/${report.threadId}">${report.threadId}</a></td>
-              <td><a href="#/post/${report.postId}">${report.postId}</a></td>
-              <td>${report.reason}</td>
-              <td>
-                <span class="status ${report.status}">
-                  ${report.status}
-                </span>
-              </td>
+              <td>${r.id}</td>
+              <td>/${r.boardId}/</td>
+              <td>${r.reason}</td>
+              <td><span class="status status-${r.status}">${r.status}</span></td>
+              <td>${this._formatDate(r.createdAt)}</td>
               <td class="actions">
-                ${report.status === 'pending' ? html`
-                  <button class="resolve" @click=${() => this._resolveReport(report.id)}>Resolve</button>
-                  <button @click=${() => this._banUser(report.postId)}>Ban User</button>
-                  <button class="delete" @click=${() => this._deletePost(report.postId)}>Delete Post</button>
-                ` : html`
-                  <button @click=${() => this._reopenReport(report.id)}>Reopen</button>
-                `}
+                ${r.status === 'pending' ? html`
+                  <button class="action btn-resolve" @click=${() => this._resolveReport(r.id, 'resolve')}>Resolve</button>
+                  <button class="action btn-dismiss" @click=${() => this._resolveReport(r.id, 'dismiss')}>Dismiss</button>
+                ` : ''}
               </td>
             </tr>
           `)}
@@ -189,102 +260,87 @@ export class ModerationTools extends LitElement {
 
   private _renderBans() {
     return html`
+      <button class="btn-primary" @click=${() => this.showBanForm = !this.showBanForm}>
+        ${this.showBanForm ? 'Cancel' : '+ New Ban'}
+      </button>
+
+      ${this.showBanForm ? html`
+        <div class="ban-form">
+          <div class="field">
+            <label>IP Address</label>
+            <input type="text" .value=${this.banIp}
+              @input=${(e: InputEvent) => this.banIp = (e.target as HTMLInputElement).value}>
+          </div>
+          <div class="field">
+            <label>Board (empty = all)</label>
+            <input type="text" .value=${this.banBoardId}
+              @input=${(e: InputEvent) => this.banBoardId = (e.target as HTMLInputElement).value}
+              placeholder="all">
+          </div>
+          <div class="field">
+            <label>Reason</label>
+            <input type="text" .value=${this.banReason}
+              @input=${(e: InputEvent) => this.banReason = (e.target as HTMLInputElement).value}>
+          </div>
+          <div class="field">
+            <label>Duration (hours)</label>
+            <input type="number" .value=${String(this.banDuration)}
+              @input=${(e: InputEvent) => this.banDuration = parseInt((e.target as HTMLInputElement).value) || 24}>
+          </div>
+          <button class="btn-primary" @click=${this._createBan}>Create Ban</button>
+        </div>
+      ` : ''}
+
+      ${this.bans.length === 0 ? html`<div class="empty" style="margin-top:12px">No bans.</div>` : html`
+        <table style="margin-top:12px">
+          <thead><tr>
+            <th>IP</th><th>Board</th><th>Reason</th><th>Expires</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            ${this.bans.map(b => html`
+              <tr>
+                <td>${b.ip}</td>
+                <td>${b.boardId === 'all' ? 'All' : `/${b.boardId}/`}</td>
+                <td>${b.reason}</td>
+                <td>${this._formatDate(b.expires)}</td>
+                <td><span class="status status-${b.status}">${b.status}</span></td>
+                <td>
+                  ${b.status === 'active' ? html`
+                    <button class="action btn-lift" @click=${() => this._liftBan(b.id)}>Lift</button>
+                  ` : ''}
+                </td>
+              </tr>
+            `)}
+          </tbody>
+        </table>
+      `}
+    `;
+  }
+
+  private _renderLog() {
+    if (this.modLog.length === 0) return html`<div class="empty">No log entries.</div>`;
+    return html`
       <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>IP (masked)</th>
-            <th>Board</th>
-            <th>Reason</th>
-            <th>Expires</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>Action</th><th>Board</th><th>By</th><th>Date</th>
+        </tr></thead>
         <tbody>
-          ${this.bans.map(ban => html`
+          ${this.modLog.map(e => html`
             <tr>
-              <td>${ban.id}</td>
-              <td>${ban.ip}</td>
-              <td>${ban.boardId === 'all' ? 'All boards' : `/${ban.boardId}/`}</td>
-              <td>${ban.reason}</td>
-              <td>${ban.expires}</td>
-              <td>
-                <span class="status ${ban.status}">
-                  ${ban.status}
-                </span>
-              </td>
-              <td class="actions">
-                ${ban.status === 'active' ? html`
-                  <button class="delete" @click=${() => this._liftBan(ban.id)}>Lift Ban</button>
-                ` : html`
-                  <button @click=${() => this._renewBan(ban.id)}>Renew</button>
-                `}
-              </td>
+              <td>${e.action}</td>
+              <td>/${e.boardId}/</td>
+              <td>${e.performedBy}</td>
+              <td>${this._formatDate(e.createdAt)}</td>
             </tr>
           `)}
         </tbody>
       </table>
-      
-      <div style="margin-top: 20px">
-        <button @click=${this._showNewBanForm}>New Ban</button>
-      </div>
     `;
-  }
-
-  private _renderSettings() {
-    return html`
-      <p>Settings panel would go here.</p>
-    `;
-  }
-
-  // Action handlers for reports
-  private _resolveReport(reportId: number) {
-    this.reports = this.reports.map(report => 
-      report.id === reportId ? {...report, status: 'resolved'} : report
-    );
-  }
-
-  private _reopenReport(reportId: number) {
-    this.reports = this.reports.map(report => 
-      report.id === reportId ? {...report, status: 'pending'} : report
-    );
-  }
-
-  private _banUser(postId: number) {
-    // In a real implementation, this would open a ban form
-    alert(`Ban user who posted ${postId}`);
-  }
-
-  private _deletePost(postId: number) {
-    // In a real implementation, this would delete the post after confirmation
-    if (confirm(`Are you sure you want to delete post ${postId}?`)) {
-      alert(`Post ${postId} deleted`);
-    }
-  }
-
-  // Action handlers for bans
-  private _liftBan(banId: number) {
-    this.bans = this.bans.map(ban => 
-      ban.id === banId ? {...ban, status: 'expired'} : ban
-    );
-  }
-
-  private _renewBan(banId: number) {
-    this.bans = this.bans.map(ban => 
-      ban.id === banId ? {...ban, status: 'active', expires: '2025-05-17'} : ban
-    );
-  }
-
-  private _showNewBanForm() {
-    // In a real implementation, this would open a form to create a new ban
-    alert('New ban form would appear here');
   }
 }
 
-// Make sure the element is defined in the custom elements registry
 declare global {
   interface HTMLElementTagNameMap {
-    'moderation-tools': ModerationTools;
+    'mod-panel': ModPanel;
   }
 }

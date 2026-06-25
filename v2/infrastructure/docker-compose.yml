@@ -34,11 +34,11 @@ services:
   # Frontend
   frontend:
     build:
-      context: ../frontend
+      context: ../frontend-modern
       dockerfile: Dockerfile
     container_name: 4chan_frontend
     volumes:
-      - ../frontend:/app
+      - ../frontend-modern:/app
       - /app/node_modules
     environment:
       - NODE_ENV=development

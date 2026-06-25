@@ -4,142 +4,220 @@ import { customElement, property, state } from 'lit/decorators.js';
 @customElement('post-creator')
 export class PostCreator extends LitElement {
   @property({ type: String }) boardId = '';
-  @property({ type: String }) threadId = ''; // Empty if creating a new thread
-  @state() private comment = '';
-  @state() private name = 'Anonymous';
-  @state() private fileInput: HTMLInputElement | null = null;
+  @property({ type: String }) threadId = '';
+  @property({ type: String, attribute: 'api-base' }) apiBase = '/api/v1';
+  @state() private name = '';
+  @state() private subject = '';
+  @state() private message = '';
+  @state() private captchaInput = '';
+  @state() private captchaUrl = '';
+  @state() private submitting = false;
+  @state() private error = '';
 
   static styles = css`
     :host {
       display: block;
-      font-family: sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
       padding: 16px;
     }
     .post-form {
-      border: 1px solid #ccc;
-      padding: 20px;
-      border-radius: 4px;
+      background: #f0e0d6;
+      border: 1px solid #d9bfb7;
+      padding: 16px;
+      max-width: 500px;
     }
-    .form-group {
-      margin-bottom: 16px;
+    h2 {
+      margin: 0 0 12px;
+      color: #800000;
+      font-size: 1.1rem;
     }
-    label {
-      display: block;
-      margin-bottom: 4px;
+    table { border-collapse: collapse; }
+    td { padding: 2px 4px; }
+    td:first-child {
+      font-size: 0.85rem;
       font-weight: bold;
+      white-space: nowrap;
     }
-    input[type="text"] {
+    input[type="text"], textarea {
       width: 100%;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      padding: 4px 6px;
+      border: 1px solid #aaa;
+      font-family: inherit;
+      font-size: 0.85rem;
     }
-    textarea {
-      width: 100%;
-      height: 120px;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      resize: vertical;
+    textarea { resize: vertical; height: 100px; }
+    input[type="file"] { font-size: 0.85rem; }
+    .captcha-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    button {
-      background-color: #4a4a4a;
-      color: white;
-      border: none;
-      padding: 10px 16px;
-      border-radius: 4px;
+    .captcha-img {
+      border: 1px solid #aaa;
+      cursor: pointer;
+    }
+    button[type="submit"] {
+      padding: 4px 16px;
       cursor: pointer;
       font-weight: bold;
     }
-    button:hover {
-      background-color: #333;
+    button[type="submit"]:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
     }
-    .file-input {
-      margin-bottom: 16px;
+    .error {
+      color: #c00;
+      font-size: 0.85rem;
+      margin-bottom: 8px;
     }
+    .subject-row {
+      display: flex;
+      gap: 4px;
+    }
+    .subject-row input { flex: 1; }
   `;
 
-  render() {
-    return html`
-      <div class="post-form">
-        <h2>${this.threadId ? 'Reply to Thread' : 'Create New Thread'}</h2>
-        <p>Posting on: /${this.boardId}/</p>
-        
-        <div class="form-group">
-          <label for="name">Name (optional)</label>
-          <input 
-            type="text" 
-            id="name" 
-            .value=${this.name}
-            @input=${(e: InputEvent) => this.name = (e.target as HTMLInputElement).value}
-          />
-        </div>
-        
-        <div class="form-group">
-          <label for="comment">Comment</label>
-          <textarea 
-            id="comment"
-            .value=${this.comment}
-            @input=${(e: InputEvent) => this.comment = (e.target as HTMLTextAreaElement).value}
-          ></textarea>
-        </div>
-        
-        <div class="file-input">
-          <label for="file">File (optional)</label>
-          <input 
-            type="file" 
-            id="file"
-            @change=${this._handleFileChange}
-          />
-        </div>
-        
-        <button @click=${this._handleSubmit}>
-          ${this.threadId ? 'Post Reply' : 'Create Thread'}
-        </button>
-      </div>
-    `;
+  connectedCallback() {
+    super.connectedCallback();
+    this._loadCaptcha();
   }
 
-  firstUpdated() {
-    this.fileInput = this.shadowRoot?.querySelector('#file') as HTMLInputElement;
+  private async _loadCaptcha() {
+    this.captchaUrl = `${this.apiBase}/captcha?t=${Date.now()}`;
   }
 
-  private _handleFileChange(e: Event) {
-    // File validation could be added here
+  private _handleFileChange(_e: Event) {
+    this.error = '';
   }
 
-  private _handleSubmit() {
-    // Simple validation
-    if (!this.comment) {
-      alert('Comment is required');
+  private async _handleSubmit(e: Event) {
+    e.preventDefault();
+    if (!this.message.trim()) {
+      this.error = 'Comment is required';
       return;
     }
 
-    const file = this.fileInput?.files?.[0] || null;
+    this.submitting = true;
+    this.error = '';
 
-    // Dispatch event to notify the shell application
-    this.dispatchEvent(new CustomEvent('post-submit', {
-      detail: {
-        boardId: this.boardId,
-        threadId: this.threadId,
-        name: this.name,
-        comment: this.comment,
-        file: file
-      },
-      bubbles: true,
-      composed: true
-    }));
+    const form = this.shadowRoot?.querySelector('form') as HTMLFormElement;
+    const fileInput = this.shadowRoot?.querySelector('#file') as HTMLInputElement;
+    const formData = new FormData();
+    formData.append('boardId', this.boardId);
+    if (this.threadId) formData.append('threadId', this.threadId);
+    if (this.name.trim()) formData.append('name', this.name);
+    if (this.subject.trim()) formData.append('subject', this.subject);
+    formData.append('message', this.message);
+    if (this.captchaInput.trim()) formData.append('captcha', this.captchaInput);
 
-    // Reset form
-    this.comment = '';
-    this.name = 'Anonymous';
-    if (this.fileInput) {
-      this.fileInput.value = '';
+    const file = fileInput?.files?.[0];
+    if (file) formData.append('file', file);
+
+    try {
+      const url = this.threadId
+        ? `${this.apiBase}/threads/${this.threadId}/posts`
+        : `${this.apiBase}/boards/${this.boardId}/threads`;
+
+      const res = await fetch(url, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || `HTTP ${res.status}`);
+      }
+
+      this.dispatchEvent(new CustomEvent('post-submit', {
+        detail: await res.json(),
+        bubbles: true,
+        composed: true,
+      }));
+
+      this.message = '';
+      this.subject = '';
+      this.captchaInput = '';
+      if (fileInput) fileInput.value = '';
+      this._loadCaptcha();
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : 'Post failed';
+    } finally {
+      this.submitting = false;
     }
+  }
+
+  render() {
+    return html`
+      <form class="post-form" @submit=${this._handleSubmit}>
+        <h2>${this.threadId ? 'Reply to Thread' : 'Create New Thread'}</h2>
+
+        ${this.error ? html`<div class="error">${this.error}</div>` : ''}
+
+        <table>
+          <tr>
+            <td>Name</td>
+            <td>
+              <input type="text" .value=${this.name}
+                @input=${(e: InputEvent) => this.name = (e.target as HTMLInputElement).value}
+                placeholder="Anonymous">
+            </td>
+          </tr>
+          ${!this.threadId ? html`
+            <tr>
+              <td>Subject</td>
+              <td>
+                <div class="subject-row">
+                  <input type="text" .value=${this.subject}
+                    @input=${(e: InputEvent) => this.subject = (e.target as HTMLInputElement).value}>
+                  <button type="submit" ?disabled=${this.submitting}>
+                    ${this.submitting ? 'Posting...' : 'Post'}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ` : ''}
+          <tr>
+            <td>Comment</td>
+            <td>
+              <textarea .value=${this.message}
+                @input=${(e: InputEvent) => this.message = (e.target as HTMLTextAreaElement).value}
+              ></textarea>
+            </td>
+          </tr>
+          <tr>
+            <td>File</td>
+            <td>
+              <input type="file" id="file" accept="image/*,video/webm"
+                @change=${this._handleFileChange}>
+            </td>
+          </tr>
+          ${this.captchaUrl ? html`
+            <tr>
+              <td>Captcha</td>
+              <td>
+                <div class="captcha-container">
+                  <img class="captcha-img" src=${this.captchaUrl} alt="captcha"
+                    width="200" height="60"
+                    @click=${this._loadCaptcha}>
+                  <input type="text" .value=${this.captchaInput}
+                    @input=${(e: InputEvent) => this.captchaInput = (e.target as HTMLInputElement).value}
+                    placeholder="Enter captcha" style="width:120px">
+                </div>
+              </td>
+            </tr>
+          ` : ''}
+          ${this.threadId ? html`
+            <tr>
+              <td></td>
+              <td>
+                <button type="submit" ?disabled=${this.submitting}>
+                  ${this.submitting ? 'Posting...' : 'Post Reply'}
+                </button>
+              </td>
+            </tr>
+          ` : ''}
+        </table>
+      </form>
+    `;
   }
 }
 
-// Make sure the element is defined in the custom elements registry
 declare global {
   interface HTMLElementTagNameMap {
     'post-creator': PostCreator;

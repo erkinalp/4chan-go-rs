@@ -1,29 +1,28 @@
+#![allow(dead_code, deprecated)]
+
 use actix_cors::Cors;
 use actix_web::{middleware as actix_middleware, web, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
-use prometheus::Registry;
 use std::net::TcpListener;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod config;
-mod routes;
 mod handlers;
 mod middleware;
-use middleware as app_middleware;
+mod routes;
+mod error;
 mod models;
 mod repositories;
 mod services;
 mod utils;
-mod error;
 
-use services::malware_scanner::{ClamAVScanner, MalwareScannerConfig as ScannerCfg};
 use config::Config;
 use repositories::{
-    postgres_repository::PostgresRepository, 
-    redis_repository::RedisRepository,
+    postgres_repository::PostgresRepository, redis_repository::RedisRepository,
     s3_repository::S3Repository,
 };
+use services::malware_scanner::{ClamAVScanner, MalwareScannerConfig as ScannerCfg};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -45,7 +44,10 @@ async fn main() -> std::io::Result<()> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set up global tracing subscriber");
 
-    info!("Starting server on {}:{}", config.server.host, config.server.port);
+    info!(
+        "Starting server on {}:{}",
+        config.server.host, config.server.port
+    );
 
     // Create database connection pool
     let postgres_repo = PostgresRepository::new(&config.database.connection_string)
@@ -53,8 +55,8 @@ async fn main() -> std::io::Result<()> {
         .expect("Failed to create database connection pool");
 
     // Create Redis client
-    let redis_repo = RedisRepository::new(&config.redis.url)
-        .expect("Failed to create Redis client");
+    let redis_repo =
+        RedisRepository::new(&config.redis.url).expect("Failed to create Redis client");
 
     // Create S3 client
     let s3_repo = S3Repository::new(
@@ -111,15 +113,18 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(redis_repo))
             .app_data(web::Data::new(s3_repo))
             .service(
-                web::scope(&format!("{}/{}", app_config.server.api_prefix, app_config.server.api_version))
-                    .configure(routes::health::configure)
-                    .configure(routes::auth::configure)
-                    .configure(routes::boards::configure)
-                    .configure(routes::threads::configure)
-                    .configure(routes::posts::configure)
-                    .configure(routes::files::configure)
-                    .configure(routes::captcha::configure)
-                    .configure(routes::moderation::configure)
+                web::scope(&format!(
+                    "{}/{}",
+                    app_config.server.api_prefix, app_config.server.api_version
+                ))
+                .configure(routes::health::configure)
+                .configure(routes::auth::configure)
+                .configure(routes::boards::configure)
+                .configure(routes::threads::configure)
+                .configure(routes::posts::configure)
+                .configure(routes::files::configure)
+                .configure(routes::captcha::configure)
+                .configure(routes::moderation::configure),
             )
     })
     .listen(listener)?

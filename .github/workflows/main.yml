@@ -1,0 +1,375 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, staging, develop, default ]
+  pull_request:
+    branches: [ main, staging, develop, default ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: v2/api-core/package-lock.json
+
+      - name: Install api-core dependencies
+        run: |
+          cd v2/api-core
+          npm ci --legacy-peer-deps
+
+      - name: Install frontend-modern dependencies
+        run: |
+          cd v2/frontend-modern
+          npm install --legacy-peer-deps --ignore-scripts
+
+      - name: Lint Backend
+        run: |
+          cd v2/api-core
+          npm run lint
+
+      - name: Lint Frontend
+        continue-on-error: true
+        run: |
+          cd v2/frontend-modern
+          npm run lint
+
+      - name: TypeCheck Backend
+        run: |
+          cd v2/api-core
+          npm run prisma:generate
+          npx tsc --noEmit
+
+      - name: TypeCheck Frontend
+        continue-on-error: true
+        run: |
+          cd v2/frontend-modern
+          npm run typecheck
+
+  lint-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: v2/file-service/go.mod
+          cache-dependency-path: v2/file-service/go.sum
+
+      - name: Run golangci-lint
+        continue-on-error: true
+        run: |
+          cd v2/file-service
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          golangci-lint run
+
+  lint-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Run clippy
+        run: |
+          cd v2/media-processor
+          cargo clippy -- -D warnings
+
+  test-api-core:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs: validate
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: v2/api-core/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd v2/api-core
+          npm ci --legacy-peer-deps
+
+      - name: Setup test database
+        run: |
+          cd v2/api-core
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db?schema=public" > .env.test
+          npm run prisma:generate
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db?schema=public npm run prisma:migrate
+
+      - name: Run api-core tests
+        run: |
+          cd v2/api-core
+          npm run test
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: v2/api-core/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd v2/frontend-modern
+          npm install --legacy-peer-deps --ignore-scripts
+
+      - name: Run frontend tests
+        run: |
+          cd v2/frontend-modern
+          npm run test
+
+  test-file-service:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs: lint-go
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: v2/file-service/go.mod
+          cache-dependency-path: v2/file-service/go.sum
+
+      - name: Build file-service
+        run: |
+          cd v2/file-service
+          go build ./...
+
+      - name: Test file-service
+        run: |
+          cd v2/file-service
+          go test ./...
+
+  test-media-processor:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs: lint-rust
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            v2/media-processor/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('v2/media-processor/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build media-processor
+        run: |
+          cd v2/media-processor
+          cargo build
+
+      - name: Test media-processor
+        run: |
+          cd v2/media-processor
+          cargo test
+
+  security-scan:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd v2/api-core
+          npm ci --legacy-peer-deps --ignore-scripts
+          cd ../frontend-modern
+          npm install --legacy-peer-deps --ignore-scripts
+
+      - name: Run npm audit (api-core)
+        run: |
+          cd v2/api-core
+          npm audit --audit-level=high || true
+
+      - name: Run npm audit (frontend-modern)
+        run: |
+          cd v2/frontend-modern
+          npm audit --audit-level=high || true
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test-api-core, test-frontend, test-file-service, test-media-processor, security-scan]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=short
+
+      - name: Build and push api-core image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./v2/api-core
+          push: true
+          tags: ghcr.io/${{ github.repository }}/api-core:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push file-service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./v2/file-service
+          push: true
+          tags: ghcr.io/${{ github.repository }}/file-service:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push media-processor image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./v2/media-processor
+          push: true
+          tags: ghcr.io/${{ github.repository }}/media-processor:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend-modern image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./v2/frontend-modern
+          push: true
+          tags: ghcr.io/${{ github.repository }}/frontend-modern:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Update deployment images
+        run: |
+          cd v2/infrastructure/kubernetes/overlays/staging
+          kustomize edit set image ghcr.io/api-core=ghcr.io/${{ github.repository }}/api-core:${{ github.sha }}
+          kustomize edit set image ghcr.io/file-service=ghcr.io/${{ github.repository }}/file-service:${{ github.sha }}
+          kustomize edit set image ghcr.io/media-processor=ghcr.io/${{ github.repository }}/media-processor:${{ github.sha }}
+          kustomize edit set image ghcr.io/frontend-modern=ghcr.io/${{ github.repository }}/frontend-modern:${{ github.sha }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -k v2/infrastructure/kubernetes/overlays/staging
+          kubectl rollout status deployment/frontend -n 4chan-staging
+          kubectl rollout status deployment/api -n 4chan-staging
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Update deployment images
+        run: |
+          cd v2/infrastructure/kubernetes/overlays/production
+          kustomize edit set image ghcr.io/api-core=ghcr.io/${{ github.repository }}/api-core:${{ github.sha }}
+          kustomize edit set image ghcr.io/file-service=ghcr.io/${{ github.repository }}/file-service:${{ github.sha }}
+          kustomize edit set image ghcr.io/media-processor=ghcr.io/${{ github.repository }}/media-processor:${{ github.sha }}
+          kustomize edit set image ghcr.io/frontend-modern=ghcr.io/${{ github.repository }}/frontend-modern:${{ github.sha }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -k v2/infrastructure/kubernetes/overlays/production
+          kubectl rollout status deployment/frontend -n 4chan-production
+          kubectl rollout status deployment/api -n 4chan-production

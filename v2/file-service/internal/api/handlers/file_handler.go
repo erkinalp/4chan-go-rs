@@ -25,9 +25,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/h2non/filetype"
-	"github.com/rs/zerolog"
 	"github.com/h2non/filetype/matchers"
 	"github.com/h2non/filetype/types"
+	"github.com/rs/zerolog"
 	"golang.org/x/image/webp"
 )
 
@@ -550,7 +550,7 @@ func (h *FileHandler) PurgeFiles(c *gin.Context) {
 	}
 
 	response := models.FilePurgeResponse{
-		TaskID:              uuid.New().String(),
+		TaskID:                uuid.New().String(),
 		EstimatedFilesToPurge: 50000,
 		EstimatedSpaceToFree:  268435456, // 256MB
 	}
@@ -569,14 +569,14 @@ func readFile(file multipart.File, size int64) ([]byte, error) {
 
 func isAllowedFileType(kind types.Type) bool {
 	allowedTypes := map[string]bool{
-		"image/jpeg":             true,
-		"image/png":              true,
-		"image/gif":              true,
-		"image/webp":             true,
-		"video/mp4":              true,
-		"video/webm":             true,
-		"application/pdf":        true,
-		"application/zip":        true,
+		"image/jpeg":                  true,
+		"image/png":                   true,
+		"image/gif":                   true,
+		"image/webp":                  true,
+		"video/mp4":                   true,
+		"video/webm":                  true,
+		"application/pdf":             true,
+		"application/zip":             true,
 		"application/x-7z-compressed": true,
 	}
 
@@ -589,20 +589,47 @@ func isImage(kind types.Type) bool {
 
 func getImageDimensions(fileData []byte) (width, height int, err error) {
 	reader := bytes.NewReader(fileData)
-	
+
 	config, _, err := image.DecodeConfig(reader)
 	if err == nil {
 		return config.Width, config.Height, nil
 	}
-	
+
 	reader.Seek(0, 0)
 	config, err = webp.DecodeConfig(reader)
 	if err == nil {
 		return config.Width, config.Height, nil
 	}
-	
+
 	return 0, 0, fmt.Errorf("failed to decode image dimensions: %w", err)
 }
+func (h *FileHandler) ListByPost(c *gin.Context) {
+	postID := c.Param("postId")
+	if postID == "" {
+		c.JSON(http.StatusBadRequest, models.Error{
+			StatusCode: http.StatusBadRequest,
+			Message:    "Post ID is required",
+			Error:      "No post ID provided",
+		})
+		return
+	}
+
+	files, err := h.fileRepo.GetFilesByPostID(c.Request.Context(), postID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.Error{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Failed to retrieve files",
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  files,
+		"count": len(files),
+	})
+}
+
 func extMatchesMime(ext string, mime string) bool {
 	if ext == "" {
 		return false

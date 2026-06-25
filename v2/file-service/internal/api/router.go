@@ -1,20 +1,23 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/handlers"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/middleware"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/auth"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/database"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/repository"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/services"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	files "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// NewRouter creates a minimal router for the file-service
+// NewRouter creates the file-service router with all routes wired
 func NewRouter(
 	cfg *config.Config,
 	logger zerolog.Logger,
@@ -24,40 +27,59 @@ func NewRouter(
 ) *gin.Engine {
 	router := gin.New()
 
-	// Metrics endpoint and middleware (only ones implemented locally)
+	// Global middleware
+	router.Use(gin.Recovery())
 	router.Use(middleware.PrometheusMiddleware())
 	router.GET("/metrics", middleware.Metrics())
 
+	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "ok",
+			"service": "file-service",
+		})
 	})
 
+	// Initialize dependencies
 	fileRepo := repository.NewFileRepository(db)
 	queueRepo := repository.NewQueueRepository(db)
 	malwareScanner := services.NewClamAVScanner(cfg.MalwareScanner)
 	fileHandler := handlers.NewFileHandler(fileStorage, fileRepo, queueRepo, malwareScanner, logger)
 
+	// JWT auth middleware
+	jwtMiddleware := auth.JWTAuthMiddleware(cfg.JWT)
+
 	// API routes
 	apiPrefix := cfg.Server.APIPrefix + "/" + cfg.Server.APIVersion
 	api := router.Group(apiPrefix)
 
-	// Swagger documentation
+	// Swagger documentation (non-production only)
 	if cfg.Environment != "production" {
 		api.GET("/swagger/*any", ginSwagger.WrapHandler(files.Handler))
 	}
 
-	// File routes
-	files := api.Group("/files")
+	// Public file routes (no auth required)
+	filesGroup := api.Group("/files")
 	{
-		files.POST("/upload", fileHandler.Upload)
-		files.GET("/:fileId", fileHandler.GetFile)
-		files.GET("/:fileId/content", fileHandler.GetFileContent)
-		files.GET("/:fileId/thumbnail", fileHandler.GetThumbnail)
+		filesGroup.GET("/:fileId", fileHandler.GetFile)
+		filesGroup.GET("/:fileId/download", fileHandler.GetFileContent)
+		filesGroup.GET("/:fileId/thumbnail", fileHandler.GetThumbnail)
+		filesGroup.POST("/check", fileHandler.CheckFile)
+		filesGroup.GET("/banned", fileHandler.GetBannedHashes)
 	}
-	api.POST("/files/check", fileHandler.CheckFile)
-	api.GET("/files/banned", fileHandler.GetBannedHashes)
-	api.GET("/files/stats", fileHandler.GetFileStats)
-	api.POST("/files/purge", fileHandler.PurgeFiles)
+
+	// Protected file routes (auth required)
+	protectedFiles := api.Group("/files")
+	protectedFiles.Use(jwtMiddleware)
+	{
+		protectedFiles.POST("", fileHandler.Upload)
+		protectedFiles.DELETE("/:fileId", fileHandler.DeleteFile)
+		protectedFiles.GET("/stats", fileHandler.GetFileStats)
+		protectedFiles.POST("/purge", fileHandler.PurgeFiles)
+	}
+
+	// Post-scoped file listing (public)
+	api.GET("/posts/:postId/files", fileHandler.ListByPost)
 
 	return router
 }

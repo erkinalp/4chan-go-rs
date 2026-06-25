@@ -2,7 +2,7 @@ import { Controller, Post, Body, UseGuards, Get, Req } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
 import { JwtAuthGuard } from "./jwt-auth.guard";
-import { LoginDto, RegisterDto, RefreshDto } from "./auth.dto";
+import { LoginDto, RegisterDto, RefreshDto, Verify2FADto } from "./auth.dto";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -41,5 +41,21 @@ export class AuthController {
   @ApiOperation({ summary: "Get current authenticated user" })
   me(@Req() req: any) {
     return req.user;
+  }
+
+  @Post("2fa/enable")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Enable 2FA for the authenticated user" })
+  enable2FA(@Req() req: any) {
+    return this.authService.enable2FA(req.user.id);
+  }
+
+  @Post("2fa/verify")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Verify a 2FA code" })
+  verify2FA(@Req() req: any, @Body() dto: Verify2FADto) {
+    return this.authService.verify2FA(req.user.id, dto.code);
   }
 }

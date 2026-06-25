@@ -4,19 +4,35 @@ use actix_web::{
     Error, HttpMessage,
 };
 use futures::future::{ok, LocalBoxFuture, Ready};
-use std::future::Future;
-use std::pin::Pin;
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use std::task::{Context, Poll};
+use uuid::Uuid;
 
 // Define middleware for JWT authentication
 pub fn jwt_auth() -> JwtAuth {
-    JwtAuth::default()
+    JwtAuth
 }
 
 // Define middleware for role-based authorization
 pub fn require_role(roles: Vec<String>) -> RequireRole {
     RequireRole { roles }
+}
+
+// JWT Claims structure
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct JwtClaims {
+    pub sub: String,
+    #[serde(default)]
+    pub email: String,
+    #[serde(default)]
+    pub role: String,
+    #[serde(default)]
+    pub exp: i64,
+    #[serde(default)]
+    pub iat: i64,
+    #[serde(default)]
+    pub iss: String,
 }
 
 #[derive(Default)]
@@ -61,6 +77,16 @@ where
         let service = Rc::clone(&self.service);
 
         Box::pin(async move {
+            // Propagate request ID
+            let request_id = req
+                .headers()
+                .get("X-Request-Id")
+                .and_then(|h| h.to_str().ok())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+            req.extensions_mut().insert(RequestId(request_id));
+
             // Extract JWT token from Authorization header
             let auth_header = req
                 .headers()
@@ -76,21 +102,35 @@ where
             // Extract the token part
             let token = &auth_header[7..];
 
-            // In a real implementation, validate the token here
-            // For this example, we'll just accept any non-empty token
             if token.is_empty() {
                 return Err(ErrorUnauthorized("Invalid token"));
             }
 
-            // Add user info to request extensions
-            // In a real app, you'd decode the JWT and extract claims
-            req.extensions_mut().insert(UserInfo {
-                user_id: "dummy_user_id".to_string(),
-                role: "USER".to_string(),
-            });
+            // Get JWT secret from app config
+            let config = req.app_data::<actix_web::web::Data<crate::config::Config>>();
+            let secret = config
+                .map(|c| c.jwt.secret.clone())
+                .unwrap_or_else(|| "default_secret".to_string());
 
-            // Call the next service
-            service.call(req).await
+            // Validate and decode the JWT token
+            let token_data = decode::<JwtClaims>(
+                token,
+                &DecodingKey::from_secret(secret.as_bytes()),
+                &Validation::new(Algorithm::HS256),
+            );
+
+            match token_data {
+                Ok(data) => {
+                    let claims = data.claims;
+                    req.extensions_mut().insert(UserInfo {
+                        user_id: claims.sub.clone(),
+                        role: claims.role.clone(),
+                        email: claims.email.clone(),
+                    });
+                    service.call(req).await
+                }
+                Err(_) => Err(ErrorUnauthorized("Invalid or expired token")),
+            }
         })
     }
 }
@@ -161,8 +201,66 @@ where
 }
 
 // User information extracted from JWT
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UserInfo {
     pub user_id: String,
     pub role: String,
+    pub email: String,
+}
+
+// Request ID for tracing
+#[derive(Clone, Debug)]
+pub struct RequestId(pub String);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_jwt_claims_deserialization() {
+        let json = r#"{"sub":"user-123","email":"test@example.com","role":"ADMIN","exp":9999999999,"iat":1000000000,"iss":"4chan-v2"}"#;
+        let claims: JwtClaims = serde_json::from_str(json).unwrap();
+        assert_eq!(claims.sub, "user-123");
+        assert_eq!(claims.email, "test@example.com");
+        assert_eq!(claims.role, "ADMIN");
+        assert_eq!(claims.exp, 9999999999);
+    }
+
+    #[test]
+    fn test_jwt_claims_defaults() {
+        let json = r#"{"sub":"user-456"}"#;
+        let claims: JwtClaims = serde_json::from_str(json).unwrap();
+        assert_eq!(claims.sub, "user-456");
+        assert_eq!(claims.email, "");
+        assert_eq!(claims.role, "");
+        assert_eq!(claims.exp, 0);
+    }
+
+    #[test]
+    fn test_user_info_clone() {
+        let info = UserInfo {
+            user_id: "user-123".to_string(),
+            role: "ADMIN".to_string(),
+            email: "test@example.com".to_string(),
+        };
+        let cloned = info.clone();
+        assert_eq!(cloned.user_id, "user-123");
+        assert_eq!(cloned.role, "ADMIN");
+    }
+
+    #[test]
+    fn test_request_id_generation() {
+        let id = RequestId(Uuid::new_v4().to_string());
+        assert!(!id.0.is_empty());
+        // Verify it's a valid UUID
+        assert!(Uuid::parse_str(&id.0).is_ok());
+    }
+
+    #[test]
+    fn test_require_role_creation() {
+        let middleware = require_role(vec!["ADMIN".to_string(), "MODERATOR".to_string()]);
+        assert_eq!(middleware.roles.len(), 2);
+        assert!(middleware.roles.contains(&"ADMIN".to_string()));
+        assert!(middleware.roles.contains(&"MODERATOR".to_string()));
+    }
 }

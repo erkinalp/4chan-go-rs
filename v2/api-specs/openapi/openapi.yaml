@@ -412,6 +412,470 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
 
+  /auth/login:
+    post:
+      summary: Authenticate user
+      description: Validates credentials and returns JWT access and refresh tokens.
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 32
+                password:
+                  type: string
+                  minLength: 8
+                  format: password
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/register:
+    post:
+      summary: Register new user
+      description: Creates a new user account and returns authentication tokens.
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+                - email
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 32
+                  pattern: '^[a-zA-Z0-9_]+$'
+                password:
+                  type: string
+                  minLength: 8
+                  format: password
+                email:
+                  type: string
+                  format: email
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Username or email already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      description: Exchange a valid refresh token for a new access token.
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      summary: Logout user
+      description: Invalidates the current session and refresh token.
+      tags:
+        - auth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /threads/{threadId}:
+    get:
+      summary: Get thread with posts
+      description: Retrieves a thread and all its posts.
+      tags:
+        - threads
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Thread with posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreadDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /threads/{threadId}/posts:
+    post:
+      summary: Create reply in thread
+      description: Posts a reply to an existing thread.
+      tags:
+        - posts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Banned or thread closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /posts/{postId}:
+    get:
+      summary: Get a single post
+      description: Retrieves a post by its ID.
+      tags:
+        - posts
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Post found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /files/{fileId}:
+    get:
+      summary: Get file metadata
+      description: Returns metadata for an uploaded file.
+      tags:
+        - files
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileMetadata'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reports:
+    post:
+      summary: Report a post
+      description: Submit a report for a post that violates rules.
+      tags:
+        - moderation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - postId
+                - threadId
+                - reason
+              properties:
+                postId:
+                  type: string
+                threadId:
+                  type: string
+                reason:
+                  type: string
+                  enum: [spam, illegal, harassment, off_topic, nsfw, other]
+                description:
+                  type: string
+                  maxLength: 500
+      responses:
+        '201':
+          description: Report submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /mod/reports:
+    get:
+      summary: List reports
+      description: View pending moderation reports. Requires moderator role.
+      tags:
+        - moderation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, resolved, dismissed]
+            default: pending
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryOffset'
+      responses:
+        '200':
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Report'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /mod/bans:
+    post:
+      summary: Ban a user
+      description: Issue a ban against a user. Requires moderator role.
+      tags:
+        - moderation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - reason
+                - duration
+              properties:
+                userId:
+                  type: string
+                reason:
+                  type: string
+                  maxLength: 500
+                duration:
+                  type: integer
+                  description: Ban duration in seconds (0 = permanent)
+                boardId:
+                  type: string
+                  nullable: true
+                  description: Board-specific ban (null = global)
+      responses:
+        '201':
+          description: Ban created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ban'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /mod/bans/{userId}:
+    delete:
+      summary: Unban a user
+      description: Remove an active ban. Requires moderator role.
+      tags:
+        - moderation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                boardId:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: User unbanned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: User unbanned successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /mod/log:
+    get:
+      summary: Get moderation log
+      description: View the audit log of all moderation actions. Requires moderator role.
+      tags:
+        - moderation
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryOffset'
+      responses:
+        '200':
+          description: Moderation action log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModAction'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   securitySchemes:
     GNAPAuth:
@@ -419,6 +883,11 @@ components:
       scheme: bearer
       bearerFormat: GNAP
       description: GNAP Access Token de autenticación
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
 
   parameters:
     QueryLimit:
@@ -1121,3 +1590,186 @@ components:
         captchaSolution:
           type: string
           example: a7x9p2
+
+    AuthTokenResponse:
+      type: object
+      required:
+        - userId
+        - token
+        - refreshToken
+      properties:
+        userId:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        token:
+          type: string
+          description: JWT access token (short-lived, typically 15 minutes)
+        refreshToken:
+          type: string
+          description: JWT refresh token (long-lived, typically 7 days)
+
+    ThreadDetail:
+      type: object
+      required:
+        - id
+        - boardId
+        - posts
+      properties:
+        id:
+          type: string
+          format: uuid
+        boardId:
+          type: string
+          format: uuid
+        subject:
+          type: string
+        sticky:
+          type: boolean
+        closed:
+          type: boolean
+        archived:
+          type: boolean
+        replyCount:
+          type: integer
+        imageCount:
+          type: integer
+        lastBumpedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        posts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+
+    FileMetadata:
+      type: object
+      required:
+        - id
+        - filename
+        - mimeType
+        - size
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+          example: image.png
+        mimeType:
+          type: string
+          example: image/png
+        size:
+          type: integer
+          example: 245000
+        width:
+          type: integer
+          example: 1920
+        height:
+          type: integer
+          example: 1080
+        md5:
+          type: string
+          example: rL0Y20zC+Fzt72VPzMSk2A==
+        sha256:
+          type: string
+          example: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        thumbnailUrl:
+          type: string
+          format: uri
+        uploadedAt:
+          type: string
+          format: date-time
+
+    Report:
+      type: object
+      required:
+        - id
+        - postId
+        - reason
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        postId:
+          type: string
+          format: uuid
+        threadId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum: [spam, illegal, harassment, off_topic, nsfw, other]
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, resolved, dismissed]
+        createdAt:
+          type: string
+          format: date-time
+
+    Ban:
+      type: object
+      required:
+        - id
+        - userId
+        - reason
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        boardId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null for global bans
+        reason:
+          type: string
+        duration:
+          type: integer
+          description: Duration in seconds (0 = permanent)
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ModAction:
+      type: object
+      required:
+        - id
+        - moderatorId
+        - action
+      properties:
+        id:
+          type: string
+          format: uuid
+        moderatorId:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [ban, unban, delete_post, delete_thread, sticky, lock, archive]
+        targetUserId:
+          type: string
+          format: uuid
+          nullable: true
+        targetPostId:
+          type: string
+          format: uuid
+          nullable: true
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time

@@ -1,16 +1,9 @@
-use actix_web::{web, Scope};
 use crate::handlers::files::{
-    upload_file, 
-    get_file_info, 
-    delete_file, 
-    get_file_content, 
-    get_thumbnail, 
-    check_file_exists, 
-    get_banned_hashes, 
-    get_file_stats, 
-    purge_files
+    check_file_exists, delete_file, get_banned_hashes, get_file_content, get_file_info,
+    get_file_stats, get_thumbnail, purge_files, upload_file,
 };
 use crate::middleware::{jwt_auth, require_role};
+use actix_web::web;
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -21,7 +14,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/{file_id}/thumbnail", web::get().to(get_thumbnail))
             .route("/check", web::post().to(check_file_exists))
             .route("/banned", web::get().to(get_banned_hashes))
-            
             .service(
                 web::scope("")
                     .wrap(jwt_auth())
@@ -30,8 +22,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .service(
                         web::scope("/admin")
                             .wrap(require_role(vec!["ADMIN".to_string()]))
-                            .route("/purge", web::post().to(purge_files))
-                    )
-            )
+                            .route("/purge", web::post().to(purge_files)),
+                    ),
+            ),
     );
 }

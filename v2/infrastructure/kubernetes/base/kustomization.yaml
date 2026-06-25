@@ -11,6 +11,8 @@ resources:
 - auth/service.yaml
 - files/deployment.yaml
 - files/service.yaml
+- media-processor/deployment.yaml
+- media-processor/service.yaml
 - postgres/statefulset.yaml
 - postgres/service.yaml
 - postgres/pvc.yaml

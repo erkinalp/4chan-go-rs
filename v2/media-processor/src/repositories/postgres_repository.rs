@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::time::Duration;
 use tracing::{debug, error};
 
@@ -25,13 +25,10 @@ impl PostgresRepository {
             })?;
 
         // Test connection
-        sqlx::query("SELECT 1")
-            .execute(&pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to execute test query: {}", e);
-                e
-            })?;
+        sqlx::query("SELECT 1").execute(&pool).await.map_err(|e| {
+            error!("Failed to execute test query: {}", e);
+            e
+        })?;
 
         debug!("Successfully connected to PostgreSQL");
 
@@ -55,10 +52,7 @@ impl PostgresRepository {
     pub async fn health_check(&self) -> Result<bool> {
         debug!("Performing health check on PostgreSQL");
 
-        match sqlx::query("SELECT 1")
-            .execute(&self.pool)
-            .await
-        {
+        match sqlx::query("SELECT 1").execute(&self.pool).await {
             Ok(_) => Ok(true),
             Err(e) => {
                 error!("Health check failed: {}", e);

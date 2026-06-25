@@ -1,0 +1,153 @@
+groups:
+  - name: slo_availability
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="api-core", status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="api-core"}[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          slo: availability
+        annotations:
+          summary: "Error rate exceeds 1% SLO threshold"
+          description: "The 5xx error rate is {{ $value | humanizePercentage }} over the last 5 minutes (SLO target: < 1%)."
+          runbook_url: "https://wiki.internal/runbooks/high-error-rate"
+
+      - alert: ServiceUnavailable
+        expr: |
+          (
+            1 - (
+              sum(rate(http_requests_total{job="api-core", status!~"5.."}[30m]))
+              /
+              sum(rate(http_requests_total{job="api-core"}[30m]))
+            )
+          ) > 0.001
+        for: 10m
+        labels:
+          severity: critical
+          slo: availability
+        annotations:
+          summary: "Availability below 99.9% SLO"
+          description: "Service availability is {{ $value | humanizePercentage }} below target over the last 30 minutes (SLO target: 99.9%)."
+
+      - alert: ServiceDown
+        expr: up{job=~"api-core|file-service|media-processor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          slo: availability
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been unreachable for more than 1 minute."
+
+  - name: slo_latency
+    rules:
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="api-core"}[5m])) by (le)
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+        annotations:
+          summary: "P95 latency exceeds 200ms SLO"
+          description: "P95 request latency is {{ $value | humanizeDuration }} (SLO target: < 200ms)."
+
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{job="api-core"}[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+        annotations:
+          summary: "P99 latency exceeds 500ms"
+          description: "P99 request latency is {{ $value | humanizeDuration }}."
+
+      - alert: SlowEndpoint
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="api-core"}[5m])) by (le, route)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          slo: latency
+        annotations:
+          summary: "Endpoint {{ $labels.route }} P95 > 500ms"
+          description: "Route {{ $labels.route }} has P95 latency of {{ $value | humanizeDuration }}."
+
+  - name: slo_resources
+    rules:
+      - alert: HighConnectionPoolUsage
+        expr: |
+          pg_pool_active_connections{job="api-core"}
+          /
+          pg_pool_max_connections{job="api-core"}
+          > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          slo: resources
+        annotations:
+          summary: "PostgreSQL connection pool > 80% utilized"
+          description: "Connection pool usage is at {{ $value | humanizePercentage }}. Consider scaling."
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          slo: resources
+        annotations:
+          summary: "Redis memory usage > 85%"
+          description: "Redis is using {{ $value | humanizePercentage }} of max memory."
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          slo: resources
+        annotations:
+          summary: "Disk space below 10%"
+          description: "Root filesystem has only {{ $value | humanizePercentage }} free space remaining."
+
+  - name: slo_file_service
+    rules:
+      - alert: FileUploadFailureRate
+        expr: |
+          (
+            sum(rate(file_upload_errors_total{job="file-service"}[5m]))
+            /
+            sum(rate(file_upload_total{job="file-service"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          slo: availability
+        annotations:
+          summary: "File upload failure rate > 5%"
+          description: "{{ $value | humanizePercentage }} of file uploads are failing."
+
+      - alert: ThumbnailGenerationSlow
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(thumbnail_generation_duration_seconds_bucket{job="media-processor"}[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+        annotations:
+          summary: "Thumbnail generation P95 > 2s"
+          description: "Thumbnail generation P95 latency is {{ $value | humanizeDuration }}."

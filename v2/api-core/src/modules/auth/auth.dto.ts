@@ -34,3 +34,10 @@ export class RefreshDto {
   @IsNotEmpty()
   refresh_token: string;
 }
+
+export class Verify2FADto {
+  @ApiProperty({ description: "6-digit TOTP code" })
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+}

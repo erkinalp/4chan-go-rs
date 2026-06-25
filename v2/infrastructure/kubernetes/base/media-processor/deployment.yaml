@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-processor
+  namespace: 4chan-v2
+  labels:
+    app: media-processor
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: media-processor
+  template:
+    metadata:
+      labels:
+        app: media-processor
+        component: backend
+    spec:
+      containers:
+      - name: media-processor
+        image: 4chan-media-processor:latest
+        ports:
+        - containerPort: 8081
+        env:
+        - name: APP_SERVER__HOST
+          value: "0.0.0.0"
+        - name: APP_SERVER__PORT
+          value: "8081"
+        - name: APP_DATABASE__URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: connection-string
+        - name: APP_REDIS__HOST
+          value: "redis-service"
+        - name: APP_REDIS__PORT
+          value: "6379"
+        - name: APP_JWT__SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: secret
+        - name: APP_S3__ENDPOINT
+          value: "http://minio-service:9000"
+        - name: APP_S3__ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: access-key
+        - name: APP_S3__SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: secret-key
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
