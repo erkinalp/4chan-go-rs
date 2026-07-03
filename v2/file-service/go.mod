@@ -17,7 +17,7 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	golang.org/x/crypto v0.51.0
-	golang.org/x/image v0.38.0
+	golang.org/x/image v0.41.0
 )
 
 require (
