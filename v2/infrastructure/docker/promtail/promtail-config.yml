@@ -1,0 +1,63 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Collect logs from all 4chan containers via the Docker socket
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: '/(4chan_.*)'
+        target_label: container
+        action: replace
+      # Only keep our project's containers
+      - source_labels: [__meta_docker_container_name]
+        regex: '/4chan_.*'
+        action: keep
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+      - source_labels: [__meta_docker_container_image]
+        target_label: image
+    pipeline_stages:
+      - docker: {}
+      - match:
+          selector: '{container=~"4chan_(api|auth|files|media_processor)"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  msg: msg
+                  message: message
+            - labels:
+                level:
+      - labeldrop:
+          - filename
+
+  # Nginx/OpenResty access + error logs from the bind-mounted log dir
+  - job_name: nginx-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          container: 4chan_nginx
+          __path__: /var/log/nginx/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="nginx"}'
+          stages:
+            - regex:
+                expression: '^(?P<remote_addr>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) (?P<protocol>[^"]+)" (?P<status>\d+)'
+            - labels:
+                method:
+                status:

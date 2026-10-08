@@ -1,5 +1,5 @@
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
+import { RequestMethod, ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import helmet from "helmet";
 import { AppModule } from "./app";
@@ -7,6 +7,20 @@ import { ConfigService } from "@nestjs/config";
 import { Logger } from "./utils/logger";
 
 async function bootstrap() {
+  // Start OpenTelemetry tracing when enabled (no-op by default). Traces go
+  // to the OTEL collector (OTEL_EXPORTER_OTLP_ENDPOINT) and on to Jaeger.
+  if (process.env.OTEL_SDK_ENABLED === "true") {
+    try {
+      const { createTracingSdk } = await import("./tracing");
+      createTracingSdk().start();
+      Logger.log("OpenTelemetry tracing enabled");
+    } catch (err) {
+      Logger.warn(
+        `OpenTelemetry SDK failed to start; continuing without tracing: ${err}`,
+      );
+    }
+  }
+
   const app = await NestFactory.create(AppModule, {
     logger: ["error", "warn", "log", "debug", "verbose"],
   });
@@ -34,8 +48,15 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Prefijo global para todas las rutas
-  app.setGlobalPrefix(`${apiPrefix}/${apiVersion}`);
+  // Prefijo global para todas las rutas (excluye endpoints operativos:
+  // /health, /ready y /metrics se sirven en la raiz para probes y Prometheus)
+  app.setGlobalPrefix(`${apiPrefix}/${apiVersion}`, {
+    exclude: [
+      { path: "health", method: RequestMethod.GET },
+      { path: "ready", method: RequestMethod.GET },
+      { path: "metrics", method: RequestMethod.GET },
+    ],
+  });
 
   // Pipes globales
   app.useGlobalPipes(

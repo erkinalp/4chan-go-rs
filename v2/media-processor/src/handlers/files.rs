@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::metrics::MediaMetrics;
 use crate::models::file::{
     BannedHashesResponse, File, FileCheckRequest, FileCheckResponse, FilePurgeRequest,
     FilePurgeResponse, FileUploadResponse,
@@ -52,6 +53,16 @@ fn looks_executable(mime: &str) -> bool {
         || mime == "application/x-sharedlib"
 }
 
+fn media_type_of(content_type: &str) -> &'static str {
+    if content_type.starts_with("image/") {
+        "image"
+    } else if content_type.starts_with("video/") {
+        "video"
+    } else {
+        "other"
+    }
+}
+
 pub async fn upload_file(
     multipart: Multipart,
     s3_repo: web::Data<S3Repository>,
@@ -59,8 +70,11 @@ pub async fn upload_file(
     config: web::Data<Config>,
     scanner: web::Data<ClamAVScanner>,
     thumbnail_gen: web::Data<ThumbnailGenerator>,
+    metrics: web::Data<MediaMetrics>,
 ) -> Result<HttpResponse, Error> {
     let start_time = Instant::now();
+    // Tracks in-flight upload processing; decremented automatically on return.
+    let _in_flight = metrics.track_operation();
     let mut file_data = Vec::new();
     let mut filename = String::new();
     let mut content_type = String::new();
@@ -136,12 +150,19 @@ pub async fn upload_file(
         format!("{:x}", hasher.finalize())
     };
 
-    if scanner
+    let scan_start = Instant::now();
+    let infected = scanner
         .get_ref()
         .scan_bytes(&file_data)
         .await
-        .map_err(|e| error::ErrorInternalServerError(format!("Scanner error: {}", e)))?
-    {
+        .map_err(|e| {
+            metrics.record_result(media_type_of(&content_type), "failed");
+            error::ErrorInternalServerError(format!("Scanner error: {}", e))
+        })?;
+    metrics.observe_operation("malware_scan", scan_start.elapsed());
+
+    if infected {
+        metrics.record_result(media_type_of(&content_type), "rejected");
         return Err(error::ErrorBadRequest("Malicious content detected"));
     }
 
@@ -170,6 +191,8 @@ pub async fn upload_file(
         .map_err(|e| error::ErrorInternalServerError(format!("Database error: {}", e)))?
     {
         let upload_duration = start_time.elapsed().as_millis() as i32;
+        metrics.observe_operation("upload_deduped", start_time.elapsed());
+        metrics.record_result(media_type_of(&content_type), "success");
 
         let response = FileUploadResponse {
             id: existing_file.id,
@@ -206,7 +229,10 @@ pub async fn upload_file(
     let thumbnail_data = if content_type.starts_with("image/")
         && thumbnail_gen.is_image_format_supported(&content_type)
     {
-        match thumbnail_gen.generate_thumbnail(&file_data, "small") {
+        let thumb_start = Instant::now();
+        let result = thumbnail_gen.generate_thumbnail(&file_data, "small");
+        metrics.observe_operation("thumbnail", thumb_start.elapsed());
+        match result {
             Ok(thumb_data) => Some(thumb_data),
             Err(e) => {
                 log::warn!("Failed to generate thumbnail: {}", e);
@@ -214,7 +240,10 @@ pub async fn upload_file(
             }
         }
     } else if content_type.starts_with("video/") {
-        match thumbnail_gen.generate_video_thumbnail(&file_data) {
+        let thumb_start = Instant::now();
+        let result = thumbnail_gen.generate_video_thumbnail(&file_data);
+        metrics.observe_operation("video_thumbnail", thumb_start.elapsed());
+        match result {
             Ok(thumb_data) => Some(thumb_data),
             Err(e) => {
                 log::warn!("Failed to generate video thumbnail: {}", e);
@@ -267,6 +296,8 @@ pub async fn upload_file(
     }
 
     let upload_duration = start_time.elapsed().as_millis() as i32;
+    metrics.observe_operation("upload", start_time.elapsed());
+    metrics.record_result(media_type_of(&content_type), "success");
 
     let response = FileUploadResponse {
         id: file.id,
