@@ -40,14 +40,12 @@ export class PowTokenService {
       db: this.config.get("REDIS_DB", 0),
     });
     // ~2^18 hashes ≈ a few seconds of work in JS/WASM; tune via env.
-    this.difficultyBits = this.config.get<number>("POW_DIFFICULTY_BITS", 18);
-    this.challengeTtlSeconds = this.config.get<number>(
-      "POW_CHALLENGE_TTL_SECONDS",
-      300,
+    this.difficultyBits = Number(this.config.get("POW_DIFFICULTY_BITS") ?? 18);
+    this.challengeTtlSeconds = Number(
+      this.config.get("POW_CHALLENGE_TTL_SECONDS") ?? 300,
     );
-    this.tokenTtlSeconds = this.config.get<number>(
-      "POW_TOKEN_TTL_SECONDS",
-      600,
+    this.tokenTtlSeconds = Number(
+      this.config.get("POW_TOKEN_TTL_SECONDS") ?? 600,
     );
   }
 

@@ -22,6 +22,8 @@ POST /auth/2fa/challenge  -> { challenge_token, code }
   `"access"`, so a challenge token can never be used as a session token.
 - `lastLoginAt` is updated only after a fully authenticated session is
   issued (not after the password step alone).
+- Access tokens also carry `user_id` and `created_at` claims — required by
+  `UserRateLimiterInterceptor`, which reads them from the verified JWT.
 
 ### 2FA management endpoints (all require a valid access token)
 

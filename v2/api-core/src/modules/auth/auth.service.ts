@@ -87,13 +87,26 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+  // Access-token payload. `user_id`/`created_at` are required by the
+  // UserRateLimiterInterceptor, which reads them from the verified JWT.
+  private accessPayload(user: User) {
+    return {
+      sub: user.id,
+      role: user.role,
+      user_id: user.id,
+      created_at: Math.floor(user.createdAt.getTime() / 1000),
+    };
+  }
+
   private async issueTokens(user: User) {
-    const payload = { sub: user.id, role: user.role };
-    const accessToken = this.jwt.sign(payload);
-    const refreshToken = this.jwt.sign(payload, {
-      secret: this.config.get("JWT_REFRESH_SECRET"),
-      expiresIn: this.config.get("JWT_REFRESH_EXPIRES_IN", "30d"),
-    });
+    const accessToken = this.jwt.sign(this.accessPayload(user));
+    const refreshToken = this.jwt.sign(
+      { sub: user.id, role: user.role },
+      {
+        secret: this.config.get("JWT_REFRESH_SECRET"),
+        expiresIn: this.config.get("JWT_REFRESH_EXPIRES_IN", "30d"),
+      },
+    );
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
@@ -123,8 +136,7 @@ export class AuthService {
     if (!stored.user.isActive || stored.user.isBanned) {
       throw new UnauthorizedException("Account unavailable");
     }
-    const payload = { sub: stored.user.id, role: stored.user.role };
-    const accessToken = this.jwt.sign(payload);
+    const accessToken = this.jwt.sign(this.accessPayload(stored.user));
     return { access_token: accessToken };
   }
 

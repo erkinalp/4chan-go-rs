@@ -103,7 +103,13 @@ describe("AuthService", () => {
       mockPrisma.refreshToken.findUnique.mockResolvedValue({
         token: "tok",
         expiresAt: futureDate,
-        user: { isActive: true, isBanned: false, id: "u1", role: "USER" },
+        user: {
+          isActive: true,
+          isBanned: false,
+          id: "u1",
+          role: "USER",
+          createdAt: new Date(),
+        },
       });
       const result = await service.refresh("tok");
       expect(result).toEqual({ access_token: "test-token" });
@@ -216,6 +222,7 @@ describe("AuthService", () => {
       twoFactorAuth: true,
       twoFactorSecret: "abcdef1234567890abcdef1234567890abcdef12",
       twoFactorBackupCodes: [],
+      createdAt: new Date(),
     };
 
     it("should reject an invalid challenge token", async () => {
