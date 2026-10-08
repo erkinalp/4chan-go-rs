@@ -217,3 +217,48 @@ impl Default for Config {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_config_fixed_values() {
+        // Only assert values that do not read environment variables, so the
+        // test is deterministic under any ambient env.
+        let cfg = Config::default();
+        assert_eq!(cfg.environment, "development");
+        assert_eq!(cfg.log_level, "info");
+        assert_eq!(cfg.server.port, 8080);
+        assert_eq!(cfg.server.api_prefix, "api");
+        assert_eq!(cfg.server.api_version, "v1");
+        assert_eq!(cfg.database.max_connections, 25);
+        assert_eq!(cfg.database.min_connections, 5);
+        assert_eq!(cfg.database.max_lifetime_seconds, 1800);
+        assert_eq!(cfg.jwt.expiration_minutes, 60);
+        assert_eq!(cfg.jwt.refresh_expiration_days, 7);
+        assert_eq!(cfg.jwt.issuer, "4chan-v2");
+        assert_eq!(cfg.captcha.verify_url, "https://www.google.com/recaptcha/api/siteverify");
+        assert_eq!(cfg.cors.max_age, 86400);
+        assert!(cfg.malware_scanner.enabled);
+        assert!(cfg.rate_limit.enabled);
+        assert!(cfg.rate_limit.per_ip);
+        assert_eq!(cfg.rate_limit.requests_per_second, 10);
+        assert_eq!(cfg.rate_limit.burst_size, 20);
+        assert_eq!(cfg.files.max_size, 10485760);
+        assert!(cfg.files.allowed_types.contains("image/jpeg"));
+        assert!(cfg.files.allowed_types.contains("video/webm"));
+    }
+
+    #[test]
+    fn default_config_env_overrides() {
+        // These fields fall back to env vars; assert only the fallback chain
+        // produces *some* value (ambient env may or may not set them).
+        let cfg = Config::default();
+        assert!(!cfg.database.connection_string.is_empty());
+        assert!(!cfg.redis.url.is_empty());
+        assert!(!cfg.jwt.secret.is_empty());
+        assert!(!cfg.s3.bucket.is_empty());
+        assert!(!cfg.malware_scanner.host.is_empty());
+    }
+}

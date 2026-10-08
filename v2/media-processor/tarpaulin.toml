@@ -1,0 +1,15 @@
+# cargo-tarpaulin configuration for local coverage runs.
+# Usage: cargo install cargo-tarpaulin && cargo tarpaulin
+# Produces coverage/tarpaulin-report.html (HTML) and coverage/lcov.info.
+
+[report]
+out = ["Html", "Lcov"]
+output-dir = "coverage"
+
+[coverage]
+# Tests themselves should not count toward coverage.
+exclude-tests = true
+# Integration tests would need Postgres/Redis/S3; only unit tests run
+# network-free, so keep --tests off to stay self-contained.
+run-types = ["Lib", "Bins"]
+timeout = "120s"
