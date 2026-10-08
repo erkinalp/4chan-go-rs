@@ -83,6 +83,11 @@ func (rc *RedisClient) SetWithTTL(ctx context.Context, key string, value interfa
 	return rc.client.Set(ctx, key, value, ttl).Err()
 }
 
+// Expire sets a TTL on an existing key without changing its value
+func (rc *RedisClient) Expire(ctx context.Context, key string, ttl time.Duration) error {
+	return rc.client.Expire(ctx, key, ttl).Err()
+}
+
 // RateLimiter increments a counter and returns whether the limit is exceeded
 func (rc *RedisClient) RateLimiter(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
 	// Get the current count

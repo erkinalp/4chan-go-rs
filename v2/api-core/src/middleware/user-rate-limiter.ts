@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NestInterceptor,
   ExecutionContext,
   CallHandler,
@@ -22,6 +23,7 @@ interface UserClaims {
 
 @Injectable()
 export class UserRateLimiterInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(UserRateLimiterInterceptor.name);
   private redis: Redis;
 
   constructor(private configService: ConfigService) {
@@ -30,6 +32,11 @@ export class UserRateLimiterInterceptor implements NestInterceptor {
       port: this.configService.get("REDIS_PORT", 6379),
       password: this.configService.get("REDIS_PASSWORD"),
       db: this.configService.get("REDIS_DB", 0),
+    });
+    // ioredis emits 'error' events on connection failures; without a listener
+    // they become unhandled errors that can crash the process.
+    this.redis.on("error", (err: Error) => {
+      this.logger.error(`Redis connection error: ${err.message}`);
     });
   }
 

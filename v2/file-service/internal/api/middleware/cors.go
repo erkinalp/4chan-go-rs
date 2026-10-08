@@ -45,13 +45,20 @@ func (cm *CORSMiddleware) Handler() gin.HandlerFunc {
 		origin := c.GetHeader("Origin")
 
 		if cm.isOriginAllowed(origin) {
-			c.Header("Access-Control-Allow-Origin", origin)
+			if cm.allowAny() {
+				// A bare "*" cannot be combined with credentialed requests;
+				// echoing the Origin with credentials=true would let any site
+				// make authenticated calls, so send the wildcard verbatim.
+				c.Header("Access-Control-Allow-Origin", "*")
+			} else {
+				c.Header("Access-Control-Allow-Origin", origin)
+				c.Header("Access-Control-Allow-Credentials", "true")
+			}
 			c.Header("Access-Control-Allow-Methods", strings.Join(cm.allowMethods, ", "))
 			c.Header("Access-Control-Allow-Headers", strings.Join(cm.allowHeaders, ", "))
-			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Max-Age", strconv.Itoa(cm.maxAge))
-			c.Header("Vary", "Origin")
 		}
+		c.Header("Vary", "Origin")
 
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -60,6 +67,15 @@ func (cm *CORSMiddleware) Handler() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func (cm *CORSMiddleware) allowAny() bool {
+	for _, allowed := range cm.allowOrigins {
+		if allowed == "*" {
+			return true
+		}
+	}
+	return false
 }
 
 func (cm *CORSMiddleware) isOriginAllowed(origin string) bool {

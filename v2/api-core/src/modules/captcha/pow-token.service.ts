@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createHash, randomBytes } from "crypto";
 import Redis from "ioredis";
@@ -27,6 +27,7 @@ import Redis from "ioredis";
 
 @Injectable()
 export class PowTokenService {
+  private readonly logger = new Logger(PowTokenService.name);
   private redis: Redis;
   private readonly difficultyBits: number;
   private readonly challengeTtlSeconds: number;
@@ -38,6 +39,10 @@ export class PowTokenService {
       port: this.config.get("REDIS_PORT", 6379),
       password: this.config.get("REDIS_PASSWORD"),
       db: this.config.get("REDIS_DB", 0),
+    });
+    // Prevent ioredis 'error' events from crashing the process unhandled.
+    this.redis.on("error", (err: Error) => {
+      this.logger.error(`Redis connection error: ${err.message}`);
     });
     // ~2^18 hashes ≈ a few seconds of work in JS/WASM; tune via env.
     this.difficultyBits = Number(this.config.get("POW_DIFFICULTY_BITS") ?? 18);

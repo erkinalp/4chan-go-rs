@@ -222,17 +222,20 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		duration := time.Since(startTime).Seconds()
 		middleware.RecordFileUpload("deduplicated", mimeType, existingFile.Filesize, duration)
 		c.JSON(http.StatusOK, models.FileUploadResponse{
-			ID:             existingFile.ID,
-			FileURL:        fmt.Sprintf("/files/%s/content", existingFile.ID),
-			ThumbnailURL:   fmt.Sprintf("/files/%s/thumbnail", existingFile.ID),
-			Filename:       existingFile.Filename,
-			Filesize:       existingFile.Filesize,
-			Width:          existingFile.Width,
-			Height:         existingFile.Height,
-			MimeType:       existingFile.MimeType,
-			MD5Hash:        existingFile.MD5Hash,
-			IsSpoilered:    existingFile.IsSpoilered,
-			UploadDuration: 0,
+			ID:                existingFile.ID,
+			FileURL:           fmt.Sprintf("/files/%s/content", existingFile.ID),
+			ThumbnailURL:      fmt.Sprintf("/files/%s/thumbnail", existingFile.ID),
+			Filename:          existingFile.Filename,
+			Filesize:          existingFile.Filesize,
+			Width:             existingFile.Width,
+			Height:            existingFile.Height,
+			MimeType:          existingFile.MimeType,
+			MD5Hash:           existingFile.MD5Hash,
+			SHA256Hash:        existingFile.SHA256Hash,
+			StoredFilename:    existingFile.StoredFilename,
+			ThumbnailFilename: existingFile.ThumbnailFilename,
+			IsSpoilered:       existingFile.IsSpoilered,
+			UploadDuration:    0,
 		})
 		return
 	}
@@ -331,17 +334,20 @@ func (h *FileHandler) Upload(c *gin.Context) {
 	}
 
 	response := models.FileUploadResponse{
-		ID:             fileID,
-		FileURL:        uploadInfo.URL,
-		ThumbnailURL:   thumbnailURL,
-		Filename:       header.Filename,
-		Filesize:       header.Size,
-		Width:          width,
-		Height:         height,
-		MimeType:       kind.MIME.Value,
-		MD5Hash:        md5Hash,
-		IsSpoilered:    spoiler,
-		UploadDuration: int(duration * 1000), // Convert to milliseconds
+		ID:                fileID,
+		FileURL:           uploadInfo.URL,
+		ThumbnailURL:      thumbnailURL,
+		Filename:          header.Filename,
+		Filesize:          header.Size,
+		Width:             width,
+		Height:            height,
+		MimeType:          kind.MIME.Value,
+		MD5Hash:           md5Hash,
+		SHA256Hash:        sha256Hash,
+		StoredFilename:    uniqueFileName,
+		ThumbnailFilename: thumbnailFilename,
+		IsSpoilered:       spoiler,
+		UploadDuration:    int(duration * 1000), // Convert to milliseconds
 	}
 
 	c.JSON(http.StatusCreated, response)
@@ -511,7 +517,7 @@ func (h *FileHandler) GetFileContent(c *gin.Context) {
 	if download {
 		contentDisposition = "attachment"
 	}
-	c.Header("Content-Disposition", fmt.Sprintf("%s; filename=%s", contentDisposition, file.Filename))
+	c.Header("Content-Disposition", fmt.Sprintf("%s; filename=%q", contentDisposition, sanitizeHeaderFilename(file.Filename)))
 	c.Header("Content-Type", file.MimeType)
 	c.Header("Content-Length", fmt.Sprintf("%d", file.Filesize))
 
@@ -674,6 +680,15 @@ func (h *FileHandler) PurgeFiles(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, response)
+}
+
+func sanitizeHeaderFilename(name string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || r == '"' || r == '\\' || r == ';' || r > 0x7e {
+			return '_'
+		}
+		return r
+	}, name)
 }
 
 func readFile(file multipart.File, size int64) ([]byte, error) {
