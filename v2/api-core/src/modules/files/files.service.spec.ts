@@ -132,8 +132,9 @@ describe("FilesService", () => {
 
       const result = await service.remove("f1");
       expect(result).toEqual({ id: "f1" });
-      expect(mockFetch).toHaveBeenCalledWith("http://files:8080/files/s1.jpg", {
+      expect(mockFetch).toHaveBeenCalledWith("http://files:8080/files/f1", {
         method: "DELETE",
+        headers: {},
       });
       expect(mockPrisma.file.delete).toHaveBeenCalledWith({
         where: { id: "f1" },

@@ -18,15 +18,25 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.fileServiceUrl = this.config.get<string>(
+    const base = this.config.get<string>(
       "FILE_SERVICE_URL",
       "http://files:8080",
     );
+    // file-service mounts its routes under <API_PREFIX>/<API_VERSION>
+    // (default /api/v1); FILE_SERVICE_URL may already include that prefix.
+    this.fileServiceUrl = base.replace(/\/$/, "");
+  }
+
+  private authHeaders(authorization?: string): Record<string, string> {
+    // file-service upload/delete routes require auth; forward the caller's
+    // bearer token so ownership/admin checks see the same identity.
+    return authorization ? { Authorization: authorization } : {};
   }
 
   async uploadFile(
     file: { buffer: Buffer; originalname: string; mimetype: string },
     postId: string,
+    authorization?: string,
   ) {
     const formData = new FormData();
     const blob = new Blob([file.buffer as unknown as ArrayBuffer], {
@@ -35,8 +45,9 @@ export class FilesService {
     formData.append("file", blob, file.originalname);
     formData.append("postId", postId);
 
-    const response = await fetch(`${this.fileServiceUrl}/upload`, {
+    const response = await fetch(`${this.fileServiceUrl}/files/upload`, {
       method: "POST",
+      headers: this.authHeaders(authorization),
       body: formData,
     }).catch((err: Error) => {
       throw new InternalServerErrorException(
@@ -110,10 +121,11 @@ export class FilesService {
     return file;
   }
 
-  async remove(id: string) {
+  async remove(id: string, authorization?: string) {
     const file = await this.findOne(id);
-    await fetch(`${this.fileServiceUrl}/files/${file.storedFilename}`, {
+    await fetch(`${this.fileServiceUrl}/files/${file.id}`, {
       method: "DELETE",
+      headers: this.authHeaders(authorization),
     }).catch(() => {
       /* best-effort remote deletion */
     });

@@ -230,6 +230,9 @@ services:
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      # Prometheus scrapes /minio/v2/metrics/cluster without auth; the metrics
+      # expose cluster capacity only, not object data.
+      - MINIO_PROMETHEUS_AUTH_TYPE=public
     command: server --console-address ":9001" /data
     networks:
       - backend

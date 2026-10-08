@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS banned_files;
+DROP TABLE IF EXISTS files;

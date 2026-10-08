@@ -4,9 +4,9 @@ groups:
       - alert: HighErrorRate
         expr: |
           (
-            sum(rate(http_requests_total{job="api-core", status=~"5.."}[5m]))
+            sum(rate(http_requests_total{job="4chan-api", status=~"5.."}[5m]))
             /
-            sum(rate(http_requests_total{job="api-core"}[5m]))
+            sum(rate(http_requests_total{job="4chan-api"}[5m]))
           ) > 0.01
         for: 5m
         labels:
@@ -21,9 +21,9 @@ groups:
         expr: |
           (
             1 - (
-              sum(rate(http_requests_total{job="api-core", status!~"5.."}[30m]))
+              sum(rate(http_requests_total{job="4chan-api", status!~"5.."}[30m]))
               /
-              sum(rate(http_requests_total{job="api-core"}[30m]))
+              sum(rate(http_requests_total{job="4chan-api"}[30m]))
             )
           ) > 0.001
         for: 10m
@@ -35,7 +35,7 @@ groups:
           description: "Service availability is {{ $value | humanizePercentage }} below target over the last 30 minutes (SLO target: 99.9%)."
 
       - alert: ServiceDown
-        expr: up{job=~"api-core|file-service|media-processor"} == 0
+        expr: up{job=~"4chan-api|4chan-files|4chan-media-processor"} == 0
         for: 1m
         labels:
           severity: critical
@@ -49,7 +49,7 @@ groups:
       - alert: HighP95Latency
         expr: |
           histogram_quantile(0.95,
-            sum(rate(http_request_duration_seconds_bucket{job="api-core"}[5m])) by (le)
+            sum(rate(http_request_duration_seconds_bucket{job="4chan-api"}[5m])) by (le)
           ) > 0.2
         for: 5m
         labels:
@@ -62,7 +62,7 @@ groups:
       - alert: HighP99Latency
         expr: |
           histogram_quantile(0.99,
-            sum(rate(http_request_duration_seconds_bucket{job="api-core"}[5m])) by (le)
+            sum(rate(http_request_duration_seconds_bucket{job="4chan-api"}[5m])) by (le)
           ) > 0.5
         for: 5m
         labels:
@@ -75,24 +75,21 @@ groups:
       - alert: SlowEndpoint
         expr: |
           histogram_quantile(0.95,
-            sum(rate(http_request_duration_seconds_bucket{job="api-core"}[5m])) by (le, route)
+            sum(rate(http_request_duration_seconds_bucket{job="4chan-api"}[5m])) by (le, endpoint)
           ) > 0.5
         for: 10m
         labels:
           severity: warning
           slo: latency
         annotations:
-          summary: "Endpoint {{ $labels.route }} P95 > 500ms"
-          description: "Route {{ $labels.route }} has P95 latency of {{ $value | humanizeDuration }}."
+          summary: "Endpoint {{ $labels.endpoint }} P95 > 500ms"
+          description: "Route {{ $labels.endpoint }} has P95 latency of {{ $value | humanizeDuration }}."
 
   - name: slo_resources
     rules:
       - alert: HighConnectionPoolUsage
         expr: |
-          pg_pool_active_connections{job="api-core"}
-          /
-          pg_pool_max_connections{job="api-core"}
-          > 0.8
+          pg_stat_database_numbackends{job="postgres"} > 80
         for: 5m
         labels:
           severity: warning
@@ -127,9 +124,9 @@ groups:
       - alert: FileUploadFailureRate
         expr: |
           (
-            sum(rate(file_upload_errors_total{job="file-service"}[5m]))
+            sum(rate(file_uploads_total{job="4chan-files", status="error"}[5m]))
             /
-            sum(rate(file_upload_total{job="file-service"}[5m]))
+            sum(rate(file_uploads_total{job="4chan-files"}[5m]))
           ) > 0.05
         for: 5m
         labels:
@@ -142,7 +139,7 @@ groups:
       - alert: ThumbnailGenerationSlow
         expr: |
           histogram_quantile(0.95,
-            sum(rate(thumbnail_generation_duration_seconds_bucket{job="media-processor"}[5m])) by (le)
+            sum(rate(media_processor_processing_duration_seconds_bucket{job="4chan-media-processor", operation=~"thumbnail|video_thumbnail"}[5m])) by (le)
           ) > 2
         for: 5m
         labels:

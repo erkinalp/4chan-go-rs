@@ -5,6 +5,7 @@ import { BadRequestException } from "@nestjs/common";
 import { createHash } from "crypto";
 
 const mockRedis = {
+  on: jest.fn(),
   setex: jest.fn(),
   get: jest.fn(),
   del: jest.fn(),

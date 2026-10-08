@@ -26,17 +26,22 @@ type File struct {
 
 // FileUploadResponse represents the response after a successful file upload
 type FileUploadResponse struct {
-	ID             string `json:"id"`
-	FileURL        string `json:"fileUrl"`
-	ThumbnailURL   string `json:"thumbnailUrl"`
-	Filename       string `json:"filename"`
-	Filesize       int64  `json:"filesize"`
-	Width          int    `json:"width,omitempty"`
-	Height         int    `json:"height,omitempty"`
-	MimeType       string `json:"mimeType"`
-	MD5Hash        string `json:"md5Hash"`
-	IsSpoilered    bool   `json:"isSpoilered,omitempty"`
-	UploadDuration int    `json:"uploadDuration,omitempty"`
+	ID           string `json:"id"`
+	FileURL      string `json:"fileUrl"`
+	ThumbnailURL string `json:"thumbnailUrl"`
+	Filename     string `json:"filename"`
+	Filesize     int64  `json:"filesize"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	MimeType     string `json:"mimeType"`
+	MD5Hash      string `json:"md5Hash"`
+	SHA256Hash   string `json:"sha256Hash,omitempty"`
+	// StoredFilename / ThumbnailFilename are needed by api-core's file proxy,
+	// which registers this metadata in its own database after upload.
+	StoredFilename    string `json:"storedFilename,omitempty"`
+	ThumbnailFilename string `json:"thumbnailFilename,omitempty"`
+	IsSpoilered       bool   `json:"isSpoilered,omitempty"`
+	UploadDuration    int    `json:"uploadDuration,omitempty"`
 }
 
 // FileCheckRequest represents a request to check if a file exists

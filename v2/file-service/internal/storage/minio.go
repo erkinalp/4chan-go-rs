@@ -89,12 +89,10 @@ func NewMinioClient(cfg config.MinioConfig) (*MinioClient, error) {
 	}, nil
 }
 
-// UploadFile uploads a file to the storage
+// UploadFile uploads a file to the storage. The caller owns the object key —
+// it is stored verbatim so that metadata recorded elsewhere (e.g. the
+// files.stored_filename column) resolves to the same object.
 func (m *MinioClient) UploadFile(ctx context.Context, fileData []byte, fileName, contentType string) (*FileInfo, error) {
-	// Generate unique file name
-	timestamp := time.Now().Unix()
-	uniqueFileName := fmt.Sprintf("%d_%s", timestamp, fileName)
-
 	// Calculate MD5 hash
 	hash := md5.Sum(fileData)
 	md5Hash := hex.EncodeToString(hash[:])
@@ -103,7 +101,7 @@ func (m *MinioClient) UploadFile(ctx context.Context, fileData []byte, fileName,
 	_, err := m.client.PutObject(
 		ctx,
 		m.bucketName,
-		uniqueFileName,
+		fileName,
 		bytes.NewReader(fileData),
 		int64(len(fileData)),
 		minio.PutObjectOptions{
@@ -121,7 +119,7 @@ func (m *MinioClient) UploadFile(ctx context.Context, fileData []byte, fileName,
 	presignedURL, err := m.client.PresignedGetObject(
 		ctx,
 		m.bucketName,
-		uniqueFileName,
+		fileName,
 		time.Hour*24*7, // URL valid for 7 days
 		url.Values{},
 	)
@@ -133,7 +131,7 @@ func (m *MinioClient) UploadFile(ctx context.Context, fileData []byte, fileName,
 	// In a real application, you would generate a separate thumbnail
 
 	return &FileInfo{
-		FileName:     uniqueFileName,
+		FileName:     fileName,
 		ContentType:  contentType,
 		Size:         int64(len(fileData)),
 		MD5Hash:      md5Hash,
