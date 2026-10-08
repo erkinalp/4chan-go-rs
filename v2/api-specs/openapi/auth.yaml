@@ -2,14 +2,17 @@ openapi: 3.0.3
 info:
   title: 4chan v2 API - Authentication
   version: 1.0.0
-  description: Authentication endpoints for user registration, login, token refresh, and logout.
+  description: Authentication endpoints for user registration, login (with TOTP 2FA), token refresh, and logout.
 
 paths:
   /auth/login:
     post:
       operationId: authLogin
       summary: Authenticate user
-      description: Validates credentials and returns JWT access and refresh tokens.
+      description: |
+        Validates credentials. When the account has TOTP 2FA enabled the
+        response is a `TwoFactorChallenge` instead of tokens; complete the
+        login via `POST /auth/2fa/challenge`.
       tags:
         - auth
       requestBody:
@@ -19,14 +22,13 @@ paths:
             schema:
               type: object
               required:
-                - username
+                - email
                 - password
               properties:
-                username:
+                email:
                   type: string
-                  minLength: 3
-                  maxLength: 32
-                  example: johndoe
+                  format: email
+                  example: user@example.com
                 password:
                   type: string
                   minLength: 8
@@ -34,11 +36,13 @@ paths:
                   example: SecurePass123!
       responses:
         '200':
-          description: Authentication successful
+          description: Authentication successful, or 2FA required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthTokenResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/AuthTokenResponse'
+                  - $ref: '#/components/schemas/TwoFactorChallenge'
         '401':
           description: Invalid credentials
           content:
@@ -52,11 +56,219 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/2fa/challenge:
+    post:
+      operationId: auth2faChallenge
+      summary: Complete a 2FA login
+      description: |
+        Verifies the challenge token returned by `/auth/login` plus a TOTP
+        code or a single-use backup code, and returns session tokens.
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - challenge_token
+                - code
+              properties:
+                challenge_token:
+                  type: string
+                  description: Short-lived JWT from the login response
+                code:
+                  type: string
+                  description: 6-digit TOTP code or a `xxxx-xxxx` backup code
+                  example: "123456"
+      responses:
+        '200':
+          description: 2FA verification successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: Invalid/expired challenge or wrong code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/2fa/enable:
+    post:
+      operationId: auth2faEnable
+      summary: Begin 2FA enrollment
+      description: |
+        Generates a TOTP secret for the authenticated user. 2FA is not
+        active until `/auth/2fa/verify` confirms a code.
+      tags:
+        - auth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: TOTP secret generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                    description: Base32 TOTP secret
+                  otpauthUrl:
+                    type: string
+                    description: otpauth:// URL for authenticator apps
+        '400':
+          description: 2FA already enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/2fa/verify:
+    post:
+      operationId: auth2faVerify
+      summary: Confirm 2FA enrollment
+      description: |
+        Verifies a TOTP code against the pending secret. On first
+        activation the response includes the account's backup codes —
+        returned only once; store them safely.
+      tags:
+        - auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  description: 6-digit TOTP code
+      responses:
+        '200':
+          description: 2FA verified/activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  verified:
+                    type: boolean
+                    example: true
+                  backup_codes:
+                    type: array
+                    items:
+                      type: string
+                    description: Present only on first activation
+        '400':
+          description: 2FA not set up or invalid code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/2fa/disable:
+    post:
+      operationId: auth2faDisable
+      summary: Disable 2FA
+      description: |
+        Requires the account password. Clears the TOTP secret and backup
+        codes and revokes all refresh tokens.
+      tags:
+        - auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordConfirm'
+      responses:
+        '200':
+          description: 2FA disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  disabled:
+                    type: boolean
+                    example: true
+        '401':
+          description: Not authenticated or wrong password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/2fa/backup-codes:
+    post:
+      operationId: auth2faBackupCodes
+      summary: Regenerate backup codes
+      description: |
+        Requires the account password. Replaces all existing backup codes
+        and returns the new set — shown only once.
+      tags:
+        - auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordConfirm'
+      responses:
+        '200':
+          description: New backup codes issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backup_codes:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: 2FA not enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated or wrong password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /auth/register:
     post:
       operationId: authRegister
       summary: Register new user
-      description: Creates a new user account and returns authentication tokens.
+      description: Creates a new user account and returns the created user.
       tags:
         - auth
       requestBody:
@@ -91,7 +303,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthTokenResponse'
+                $ref: '#/components/schemas/UserResponse'
         '400':
           description: Validation error
           content:
@@ -119,11 +331,11 @@ paths:
             schema:
               type: object
               required:
-                - refreshToken
+                - refresh_token
               properties:
-                refreshToken:
+                refresh_token:
                   type: string
-                  description: JWT refresh token from login/register
+                  description: JWT refresh token from login/2FA completion
       responses:
         '200':
           description: Token refreshed
@@ -132,7 +344,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  token:
+                  access_token:
                     type: string
                     description: New JWT access token
         '401':
@@ -146,11 +358,22 @@ paths:
     post:
       operationId: authLogout
       summary: Logout user
-      description: Invalidates the current session and refresh token.
+      description: Invalidates the given refresh token.
       tags:
         - auth
       security:
         - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
       responses:
         '200':
           description: Logged out successfully
@@ -161,7 +384,30 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Logged out successfully
+                    example: Logged out
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      operationId: authMe
+      summary: Get current authenticated user
+      description: Returns the profile of the user the access token belongs to.
+      tags:
+        - auth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
         '401':
           description: Not authenticated
           content:
@@ -180,16 +426,48 @@ components:
     AuthTokenResponse:
       type: object
       properties:
-        userId:
+        access_token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+          description: JWT refresh token (long-lived)
+        user:
+          $ref: '#/components/schemas/UserResponse'
+
+    TwoFactorChallenge:
+      type: object
+      properties:
+        two_factor_required:
+          type: boolean
+          example: true
+        challenge_token:
+          type: string
+          description: Short-lived JWT for POST /auth/2fa/challenge
+
+    PasswordConfirm:
+      type: object
+      required:
+        - password
+      properties:
+        password:
+          type: string
+          format: password
+
+    UserResponse:
+      type: object
+      properties:
+        id:
           type: string
           format: uuid
           example: 550e8400-e29b-41d4-a716-446655440000
-        token:
+        username:
           type: string
-          description: JWT access token (short-lived)
-        refreshToken:
+          example: anon
+        role:
           type: string
-          description: JWT refresh token (long-lived)
+          enum: [USER, JANITOR, MODERATOR, ADMIN]
+          example: USER
 
     ErrorResponse:
       type: object

@@ -41,3 +41,24 @@ export class Verify2FADto {
   @IsNotEmpty()
   code: string;
 }
+
+export class TwoFactorChallengeDto {
+  @ApiProperty({ description: "Challenge token returned by /auth/login" })
+  @IsString()
+  @IsNotEmpty()
+  challenge_token: string;
+
+  @ApiProperty({
+    description: "6-digit TOTP code or a single-use backup code",
+  })
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+}
+
+export class PasswordConfirmDto {
+  @ApiProperty({ description: "Current account password" })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
