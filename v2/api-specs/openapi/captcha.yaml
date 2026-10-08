@@ -80,13 +80,12 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /captcha/verify:
+  /captcha/validate:
     post:
       summary: Verificar CAPTCHA
       description: |
-        Verifica la solución proporcionada para un CAPTCHA específico. 
-        Esta verificación es necesaria antes de realizar acciones como 
-        crear hilos, posts o reportes.
+        Verifica la solución proporcionada para un CAPTCHA específico.
+        La solución se consume al validar (un solo uso).
       tags:
         - captcha
       requestBody:
@@ -96,17 +95,121 @@ paths:
             schema:
               type: object
               required:
-                - captchaId
+                - id
                 - solution
               properties:
-                captchaId:
+                id:
                   type: string
-                  description: ID del CAPTCHA
-                  example: 123e4567-e89b-12d3-a456-426614174000
+                  description: ID del CAPTCHA devuelto por GET /captcha
+                  example: 6f2a1c9e0b3d4e5f8a7b6c5d4e3f2a1b
                 solution:
                   type: string
                   description: Solución proporcionada por el usuario
-                  example: a7x9p2
+                  example: A7X9P2
+      responses:
+        '200':
+          description: Solución correcta
+          content:
+            application/json:
+              schema:
+                type: boolean
+                example: true
+        '400':
+          description: CAPTCHA inválido, expirado o solución incorrecta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /captcha/pow/challenge:
+    get:
+      summary: Emitir un reto de proof-of-work
+      description: |
+        Emite un reto de prueba de trabajo (estilo Privacy Pass) para
+        mitigación anti-spam. El cliente debe encontrar un `nonce` tal que
+        `sha256(challenge + ":" + nonce)` tenga al menos `difficulty_bits`
+        bits iniciales en cero. El reto es de un solo uso y expira en
+        `expires_in` segundos.
+      tags:
+        - captcha
+      responses:
+        '200':
+          description: Reto emitido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PowChallenge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /captcha/pow/redeem:
+    post:
+      summary: Canjear una solución PoW por un token
+      description: |
+        Verifica la solución de proof-of-work, consume el reto de forma
+        atómica y devuelve un token de un solo uso canjeable en endpoints
+        protegidos contra spam.
+      tags:
+        - captcha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - challenge_id
+                - nonce
+              properties:
+                challenge_id:
+                  type: string
+                  description: ID del reto de /captcha/pow/challenge
+                nonce:
+                  type: string
+                  description: Nonce que satisface la dificultad requerida
+      responses:
+        '200':
+          description: Token emitido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Token de un solo uso
+                  expires_in:
+                    type: integer
+                    description: TTL del token en segundos
+        '400':
+          description: Reto inválido/expirado o prueba de trabajo insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /captcha/pow/verify:
+    post:
+      summary: Verificar y consumir un token PoW
+      description: |
+        Verifica un token PoW y lo consume atómicamente (protección contra
+        reutilización). Un segundo uso del mismo token devuelve
+        `valid: false`.
+      tags:
+        - captcha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
       responses:
         '200':
           description: Resultado de la verificación
@@ -115,32 +218,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  success:
+                  valid:
                     type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: CAPTCHA verification successful
-                  token:
-                    type: string
-                    description: Token que puede usarse para validar acciones posteriores
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          description: Verificación fallida
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: Incorrect CAPTCHA solution
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
 
   /captcha/audio/{captchaId}:
     get:
@@ -394,6 +473,34 @@ components:
             $ref: '#/components/schemas/Error'
 
   schemas:
+    PowChallenge:
+      type: object
+      required:
+        - challenge_id
+        - challenge
+        - algorithm
+        - difficulty_bits
+        - expires_in
+      properties:
+        challenge_id:
+          type: string
+          example: 6f2a1c9e0b3d4e5f8a7b6c5d4e3f2a1b
+        challenge:
+          type: string
+          description: Cadena aleatoria a prefijar en el hash
+          example: 1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e
+        algorithm:
+          type: string
+          enum: [sha256]
+        difficulty_bits:
+          type: integer
+          description: Bits iniciales en cero requeridos en el digest
+          example: 18
+        expires_in:
+          type: integer
+          description: TTL del reto en segundos
+          example: 300
+
     Error:
       type: object
       required:

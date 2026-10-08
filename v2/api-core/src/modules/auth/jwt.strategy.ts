@@ -16,7 +16,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; role: string }) {
+  async validate(payload: { sub: string; role: string; purpose?: string }) {
+    // Tokens minted for a different purpose (e.g. pending 2FA challenges)
+    // must never authenticate a request.
+    if (payload.purpose && payload.purpose !== "access") {
+      throw new UnauthorizedException();
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {

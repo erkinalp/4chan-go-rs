@@ -4,6 +4,7 @@ import { PrismaService } from "../../services/prisma/prisma.service";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { UnauthorizedException, BadRequestException } from "@nestjs/common";
+import * as argon2 from "argon2";
 
 const mockPrisma = {
   user: {
@@ -20,6 +21,7 @@ const mockPrisma = {
 
 const mockJwt = {
   sign: jest.fn().mockReturnValue("test-token"),
+  verifyAsync: jest.fn(),
 };
 
 const mockConfig = {
@@ -168,6 +170,139 @@ describe("AuthService", () => {
       await expect(service.verify2FA("u1", "000000")).rejects.toThrow(
         BadRequestException,
       );
+    });
+  });
+
+  describe("login with 2FA enabled", () => {
+    const twoFactorUser = {
+      id: "u1",
+      email: "a@b.com",
+      username: "anon",
+      role: "USER",
+      passwordHash: "",
+      isActive: true,
+      isBanned: false,
+      twoFactorAuth: true,
+      twoFactorSecret: "abcdef1234567890abcdef1234567890abcdef12",
+      twoFactorBackupCodes: [],
+    };
+
+    it("should return a 2FA challenge instead of tokens", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...twoFactorUser,
+        passwordHash: await argon2.hash("pw"),
+      });
+      const result = await service.login("a@b.com", "pw");
+      expect(result).toEqual({
+        two_factor_required: true,
+        challenge_token: "test-token",
+      });
+      expect(mockJwt.sign).toHaveBeenCalledWith(
+        { sub: "u1", purpose: "2fa-pending" },
+        expect.objectContaining({ expiresIn: "5m" }),
+      );
+      expect(mockPrisma.refreshToken.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("verifyTwoFactorChallenge", () => {
+    const twoFactorUser = {
+      id: "u1",
+      email: "a@b.com",
+      username: "anon",
+      role: "USER",
+      isActive: true,
+      isBanned: false,
+      twoFactorAuth: true,
+      twoFactorSecret: "abcdef1234567890abcdef1234567890abcdef12",
+      twoFactorBackupCodes: [],
+    };
+
+    it("should reject an invalid challenge token", async () => {
+      mockJwt.verifyAsync.mockRejectedValue(new Error("bad token"));
+      await expect(
+        service.verifyTwoFactorChallenge("bogus", "123456"),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it("should reject a token without the 2fa purpose", async () => {
+      mockJwt.verifyAsync.mockResolvedValue({ sub: "u1" });
+      await expect(
+        service.verifyTwoFactorChallenge("tok", "123456"),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it("should accept a valid backup code and consume it", async () => {
+      const crypto = await import("crypto");
+      const backupHash = crypto
+        .createHash("sha256")
+        .update("abcd1234")
+        .digest("hex");
+      mockJwt.verifyAsync.mockResolvedValue({
+        sub: "u1",
+        purpose: "2fa-pending",
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...twoFactorUser,
+        twoFactorBackupCodes: [backupHash],
+      });
+      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockPrisma.user.update.mockResolvedValue({});
+      const result = await service.verifyTwoFactorChallenge("tok", "abcd-1234");
+      expect(result).toHaveProperty("access_token", "test-token");
+      // The used code is removed from the stored set.
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { twoFactorBackupCodes: [] },
+        }),
+      );
+    });
+
+    it("should reject a wrong code", async () => {
+      mockJwt.verifyAsync.mockResolvedValue({
+        sub: "u1",
+        purpose: "2fa-pending",
+      });
+      mockPrisma.user.findUnique.mockResolvedValue(twoFactorUser);
+      await expect(
+        service.verifyTwoFactorChallenge("tok", "000000"),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe("disable2FA", () => {
+    it("should reject a wrong password", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: "u1",
+        passwordHash: await argon2.hash("correct"),
+        twoFactorAuth: true,
+      });
+      await expect(service.disable2FA("u1", "wrong")).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it("should clear 2FA fields and revoke refresh tokens", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: "u1",
+        passwordHash: await argon2.hash("correct"),
+        twoFactorAuth: true,
+      });
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.refreshToken.deleteMany.mockResolvedValue({ count: 1 });
+      const result = await service.disable2FA("u1", "correct");
+      expect(result).toEqual({ disabled: true });
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: "u1" },
+        data: {
+          twoFactorAuth: false,
+          twoFactorSecret: null,
+          twoFactorBackupCodes: [],
+        },
+      });
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "u1" },
+      });
     });
   });
 });

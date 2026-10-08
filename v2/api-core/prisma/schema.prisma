@@ -21,7 +21,8 @@ model User {
   isActive       Boolean        @default(true)
   isBanned       Boolean        @default(false)
   twoFactorAuth  Boolean        @default(false)
-  twoFactorSecret String?       
+  twoFactorSecret String?
+  twoFactorBackupCodes String[] // SHA-256 hashes of single-use backup codes
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   lastLoginAt    DateTime?

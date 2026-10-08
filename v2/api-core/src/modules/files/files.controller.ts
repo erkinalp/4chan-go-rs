@@ -41,8 +41,9 @@ export class FilesController {
 
   @Post("metadata")
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Register file metadata after upload (internal)" })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Register file metadata after upload (admin only)" })
   createMetadata(@Body() dto: FileMetadataDto) {
     return this.filesService.createMetadata(dto);
   }
