@@ -19,6 +19,7 @@ type File struct {
 	IsSpoilered       bool      `json:"isSpoilered"`
 	CreatedAt         time.Time `json:"createdAt"`
 	PostID            string    `json:"postId,omitempty"`
+	UploaderID        string    `json:"uploaderId,omitempty"`
 	FileURL           string    `json:"fileUrl"`
 	ThumbnailURL      string    `json:"thumbnailUrl"`
 }
