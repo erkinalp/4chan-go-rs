@@ -45,6 +45,7 @@ const ReplyForm: React.FC<ReplyFormProps> = ({ boardId, threadId, onSubmit, isLo
   return (
     <form
       onSubmit={handleSubmit}
+      className="reply-form"
       style={{
         background: 'var(--bg-post)',
         border: '1px solid var(--border)',

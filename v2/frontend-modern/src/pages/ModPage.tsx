@@ -67,6 +67,7 @@ const ModPage: React.FC = () => {
             {reportsLoading ? (
               <LoadingFallback />
             ) : (
+              <div className="table-wrap">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -147,6 +148,7 @@ const ModPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
             {reportsData?.data.length === 0 && (
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
@@ -161,6 +163,7 @@ const ModPage: React.FC = () => {
             {bansLoading ? (
               <LoadingFallback />
             ) : (
+              <div className="table-wrap">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -195,6 +198,7 @@ const ModPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </>
         )}
@@ -204,6 +208,7 @@ const ModPage: React.FC = () => {
             {logLoading ? (
               <LoadingFallback />
             ) : (
+              <div className="table-wrap">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -226,6 +231,7 @@ const ModPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </>
         )}

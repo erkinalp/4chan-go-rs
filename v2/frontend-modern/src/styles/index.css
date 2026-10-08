@@ -54,3 +54,113 @@ img {
 .quotelink {
   color: var(--quotelink, #dd0000);
 }
+
+/* Layout */
+
+.site-header {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.main-content {
+  flex: 1;
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.board-nav {
+  overflow-x: auto;
+  white-space: nowrap;
+  text-align: center;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  scrollbar-width: thin;
+}
+
+.breadcrumbs {
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+.breadcrumbs-sep {
+  color: var(--text-muted);
+}
+
+/* Post layout */
+
+.reply-indent {
+  margin-left: 20px;
+  margin-bottom: 4px;
+}
+
+.report-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 8px;
+  color: var(--link);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+.report-link:hover {
+  color: var(--link-hover);
+}
+
+/* Forms */
+
+.reply-form {
+  width: 100%;
+}
+
+.report-form {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Tables scroll horizontally on narrow screens */
+
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap table {
+  min-width: 560px;
+}
+
+/* Mobile pass — targets <= 480px so 375px phones are usable */
+
+@media (max-width: 480px) {
+  .site-header {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+  }
+
+  .main-content {
+    padding: 8px;
+  }
+
+  .board-nav {
+    text-align: left;
+    font-size: 0.75rem;
+  }
+
+  .reply-indent {
+    margin-left: 8px;
+  }
+
+  .reply-form {
+    font-size: 0.8rem;
+  }
+
+  .reply-form td {
+    padding: 2px;
+  }
+}
