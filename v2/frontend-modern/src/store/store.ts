@@ -11,6 +11,7 @@ import {
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import authReducer from '@/features/auth/authSlice';
+import { injectStore } from '@/api/axios';
 
 const persistConfig = {
   key: 'root',
@@ -36,6 +37,10 @@ export const store = configureStore({
 });
 
 export const persistor = persistStore(store);
+
+// Make the store reachable from the axios interceptors without a
+// static import cycle (axios -> store -> authSlice -> axios).
+injectStore(store);
 
 export type RootState = ReturnType<typeof rootReducer>;
 export type AppDispatch = typeof store.dispatch;

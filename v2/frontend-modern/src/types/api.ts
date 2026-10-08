@@ -60,6 +60,8 @@ export interface Thread {
   lastReplies?: Post[];
 }
 
+export type ReportReason = 'ILLEGAL' | 'SPAM' | 'OFFENSIVE' | 'OFF_TOPIC' | 'OTHER';
+
 export interface Report {
   id: string;
   boardId: string;

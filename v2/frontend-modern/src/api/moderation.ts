@@ -1,6 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from './axios';
-import type { Report, Ban, ModLogEntry, PaginatedResponse } from '@/types/api';
+import type { Report, ReportReason, Ban, ModLogEntry, PaginatedResponse } from '@/types/api';
+
+export interface CreateReportPayload {
+  reason: ReportReason;
+  additionalInfo?: string;
+  postId?: string;
+  threadId?: string;
+}
+
+/**
+ * Submit a report for a post or thread. Anonymous — no auth required
+ * (api-core: POST /moderation/reports).
+ */
+export function useCreateReport() {
+  return useMutation({
+    mutationFn: async (payload: CreateReportPayload) => {
+      const { data } = await api.post('/moderation/reports', payload);
+      return data;
+    },
+  });
+}
 
 export function useReports(status?: string) {
   return useQuery<PaginatedResponse<Report>>({

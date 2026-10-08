@@ -5,6 +5,7 @@ import { useBoard } from '@/api/boards';
 import { useThreads, useCreateThread } from '@/api/threads';
 import ThreadPreview from '@/components/ThreadPreview';
 import ReplyForm from '@/components/ReplyForm';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import LoadingFallback from '@/components/LoadingFallback';
 
 const BoardPage: React.FC = () => {
@@ -35,6 +36,13 @@ const BoardPage: React.FC = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <Breadcrumbs
+        items={[
+          { label: 'Home', to: '/' },
+          { label: 'Boards', to: '/boards' },
+          { label: `/${boardId}/` },
+        ]}
+      />
       <div style={{ textAlign: 'center', marginBottom: '16px' }}>
         <h1 style={{ fontSize: '1.3rem', color: 'var(--accent)' }}>
           /{boardId}/ - {board?.title ?? boardId}
