@@ -29,7 +29,7 @@ func NewPostgresDB(cfg config.DatabaseConfig) (*PostgresDB, error) {
 	poolConfig.MaxConns = int32(cfg.MaxOpenConns)
 	poolConfig.MinConns = int32(cfg.MaxIdleConns)
 	poolConfig.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
-	
+
 	// Create a connection pool
 	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
@@ -66,17 +66,17 @@ func (db *PostgresDB) Ping(ctx context.Context) error {
 func (db *PostgresDB) RunMigrations() error {
 	// Use golang-migrate to run migrations
 	migrationDir := "file://migrations"
-	
+
 	// Create a new migrate instance
 	m, err := migrate.New(migrationDir, db.pool.Config().ConnConfig.ConnString())
 	if err != nil {
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
-	
+
 	// Run migrations
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
-	
+
 	return nil
 }

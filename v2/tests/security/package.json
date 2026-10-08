@@ -1,0 +1,17 @@
+{
+  "name": "4chan-v2-security-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest --config ../integration/jest.config.ts --testPathPattern=security --runInBand"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.0",
+    "axios": "^1.7.2",
+    "form-data": "^4.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.5.0"
+  }
+}

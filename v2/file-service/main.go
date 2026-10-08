@@ -12,11 +12,11 @@ import (
 
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api"
-	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/storage"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/database"
-	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/repository"
-	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/worker"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/logger"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/repository"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/storage"
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/worker"
 	"github.com/gin-gonic/gin"
 )
 

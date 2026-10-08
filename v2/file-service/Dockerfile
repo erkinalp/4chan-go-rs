@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.20-alpine AS build
+FROM golang:1.25-alpine AS build
 
 # Set working directory
 WORKDIR /app
@@ -20,7 +20,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o fileservice .
 
 # Production stage
-FROM alpine:3.18
+FROM alpine:3.23
 
 # Set working directory
 WORKDIR /app

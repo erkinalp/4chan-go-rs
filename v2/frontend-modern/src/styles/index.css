@@ -1,0 +1,56 @@
+@import './themes.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-primary, #ffffee);
+  color: var(--text-primary, #800000);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--link, #0000ee);
+  text-decoration: underline;
+}
+
+a:hover {
+  color: var(--link-hover, #dd0000);
+}
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.greentext {
+  color: var(--greentext, #789922);
+}
+
+.quotelink {
+  color: var(--quotelink, #dd0000);
+}

@@ -1,10 +1,10 @@
-use actix_web::{web, HttpResponse, Scope};
+use actix_web::{web, HttpResponse};
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/captcha")
             .route("", web::get().to(get_captcha))
-            .route("/verify", web::post().to(verify_captcha))
+            .route("/verify", web::post().to(verify_captcha)),
     );
 }
 

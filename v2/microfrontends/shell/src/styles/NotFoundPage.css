@@ -1,0 +1,39 @@
+.not-found-page {
+  text-align: center;
+  padding: 60px 16px;
+}
+.not-found-code {
+  font-size: 3rem;
+  color: #800000;
+}
+.not-found-title {
+  margin-top: 8px;
+}
+.not-found-message {
+  color: #666;
+  margin-top: 12px;
+}
+.not-found-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.back-button, .home-button {
+  padding: 8px 16px;
+  border: 1px solid #d9bfb7;
+  text-decoration: none;
+  cursor: pointer;
+  background: #f0e0d6;
+  color: #800000;
+}
+.not-found-suggestions {
+  margin-top: 32px;
+}
+.suggestions-links {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}

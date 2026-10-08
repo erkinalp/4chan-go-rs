@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/handlers"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/middleware"
@@ -11,8 +13,8 @@ import (
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // NewRouter creates a router for the file-service with full middleware stack
@@ -66,7 +68,10 @@ func NewRouter(
 
 	// Health check endpoint (no auth required)
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "ok",
+			"service": "file-service",
+		})
 	})
 
 	// Initialize repositories and services
@@ -79,7 +84,7 @@ func NewRouter(
 	apiPrefix := cfg.Server.APIPrefix + "/" + cfg.Server.APIVersion
 	api := router.Group(apiPrefix)
 
-	// Swagger documentation (no auth in non-production)
+	// Swagger documentation (non-production only)
 	if cfg.Environment != "production" {
 		api.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
@@ -91,20 +96,26 @@ func NewRouter(
 	{
 		publicFiles.GET("/:fileId", fileHandler.GetFile)
 		publicFiles.GET("/:fileId/content", fileHandler.GetFileContent)
+		// /download kept as an alias of /content for backwards compatibility
+		publicFiles.GET("/:fileId/download", fileHandler.GetFileContent)
 		publicFiles.GET("/:fileId/thumbnail", fileHandler.GetThumbnail)
 	}
+
+	// File check endpoint (optional auth for rate limiting)
+	api.POST("/files/check", authMiddleware.OptionalAuth(), rateLimiter.RateLimitMiddleware(), fileHandler.CheckFile)
+
+	// Post-scoped file listing (public, optional auth for rate limiting)
+	api.GET("/posts/:postId/files", authMiddleware.OptionalAuth(), rateLimiter.RateLimitMiddleware(), fileHandler.ListByPost)
 
 	// Protected file routes (require authentication)
 	protectedFiles := api.Group("/files")
 	protectedFiles.Use(authMiddleware.RequireAuth())
 	protectedFiles.Use(rateLimiter.RateLimitMiddleware())
 	{
+		protectedFiles.POST("", fileHandler.Upload)
 		protectedFiles.POST("/upload", fileHandler.Upload)
 		protectedFiles.DELETE("/:fileId", fileHandler.DeleteFile)
 	}
-
-	// File check endpoint (optional auth for rate limiting)
-	api.POST("/files/check", authMiddleware.OptionalAuth(), rateLimiter.RateLimitMiddleware(), fileHandler.CheckFile)
 
 	// Admin-only routes
 	adminFiles := api.Group("/files")

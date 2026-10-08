@@ -36,9 +36,9 @@ func init() {
 }
 
 type RateLimiter struct {
-	redis         *database.RedisClient
-	cfg           config.RateLimitConfig
-	ipHeaderName  string
+	redis        *database.RedisClient
+	cfg          config.RateLimitConfig
+	ipHeaderName string
 }
 
 func NewRateLimiter(redis *database.RedisClient, cfg config.RateLimitConfig) *RateLimiter {
@@ -143,7 +143,7 @@ func (rl *RateLimiter) RateLimitMiddleware() gin.HandlerFunc {
 func (rl *RateLimiter) calculateUserWindowStart(userCreatedAt time.Time, ctx context.Context, identifier string) time.Time {
 	blockEndKey := fmt.Sprintf("rate_limit:block_end:%s", identifier)
 	blockEndStr, err := rl.redis.Get(ctx, blockEndKey)
-	
+
 	var baseTime time.Time
 	if err == nil && blockEndStr != "" {
 		blockEndUnix, parseErr := strconv.ParseInt(blockEndStr, 10, 64)
@@ -158,18 +158,18 @@ func (rl *RateLimiter) calculateUserWindowStart(userCreatedAt time.Time, ctx con
 
 	now := time.Now()
 	windowDuration := time.Duration(rl.cfg.WindowSeconds) * time.Second
-	
+
 	elapsed := now.Sub(baseTime)
 	windowsElapsed := int64(elapsed / windowDuration)
 	windowStart := baseTime.Add(time.Duration(windowsElapsed) * windowDuration)
-	
+
 	return windowStart
 }
 
 func (rl *RateLimiter) calculateIPWindowStart(ctx context.Context, identifier string) time.Time {
 	offsetKey := fmt.Sprintf("rate_limit:user_offset:%s", identifier)
 	offsetStr, err := rl.redis.Get(ctx, offsetKey)
-	
+
 	var baseTime time.Time
 	if err == nil && offsetStr != "" {
 		offsetUnix, parseErr := strconv.ParseInt(offsetStr, 10, 64)
@@ -198,11 +198,11 @@ func (rl *RateLimiter) calculateIPWindowStart(ctx context.Context, identifier st
 
 	now := time.Now()
 	windowDuration := time.Duration(rl.cfg.WindowSeconds) * time.Second
-	
+
 	elapsed := now.Sub(baseTime)
 	windowsElapsed := int64(elapsed / windowDuration)
 	windowStart := baseTime.Add(time.Duration(windowsElapsed) * windowDuration)
-	
+
 	return windowStart
 }
 
@@ -218,44 +218,44 @@ func (rl *RateLimiter) isBlocked(ctx context.Context, identifier string) (bool, 
 func (rl *RateLimiter) blockIdentifier(ctx context.Context, identifier string) error {
 	blockKey := fmt.Sprintf("rate_limit:block:%s", identifier)
 	blockEndKey := fmt.Sprintf("rate_limit:block_end:%s", identifier)
-	
+
 	blockDuration := time.Duration(rl.cfg.WindowSeconds) * time.Second
 	blockEndTime := time.Now().Add(blockDuration)
-	
+
 	if err := rl.redis.Set(ctx, blockKey, "1", blockDuration); err != nil {
 		return err
 	}
-	
+
 	return rl.redis.Set(ctx, blockEndKey, strconv.FormatInt(blockEndTime.Unix(), 10), 24*time.Hour)
 }
 
 func (rl *RateLimiter) extendBlock(ctx context.Context, identifier string) error {
 	blockKey := fmt.Sprintf("rate_limit:block:%s", identifier)
 	blockEndKey := fmt.Sprintf("rate_limit:block_end:%s", identifier)
-	
+
 	blockDuration := time.Duration(rl.cfg.WindowSeconds) * time.Second
 	blockEndTime := time.Now().Add(blockDuration)
-	
+
 	if err := rl.redis.Set(ctx, blockKey, "1", blockDuration); err != nil {
 		return err
 	}
-	
+
 	return rl.redis.Set(ctx, blockEndKey, strconv.FormatInt(blockEndTime.Unix(), 10), 24*time.Hour)
 }
 
 func (rl *RateLimiter) incrementCounter(ctx context.Context, identifier string, windowStart time.Time) (int, error) {
 	countKey := fmt.Sprintf("rate_limit:count:%s:%d", identifier, windowStart.Unix())
-	
+
 	count, err := rl.redis.Increment(ctx, countKey)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	if count == 1 {
 		windowDuration := time.Duration(rl.cfg.WindowSeconds) * time.Second
 		rl.redis.Set(ctx, countKey, "1", windowDuration)
 	}
-	
+
 	return int(count), nil
 }
 
@@ -263,10 +263,10 @@ func (rl *RateLimiter) getClientIP(c *gin.Context) string {
 	if ip := c.GetHeader(rl.ipHeaderName); ip != "" {
 		return ip
 	}
-	
+
 	if ip := c.GetHeader("X-Forwarded-For"); ip != "" {
 		return ip
 	}
-	
+
 	return c.ClientIP()
 }

@@ -1,0 +1,184 @@
+openapi: 3.0.3
+info:
+  title: 4chan v2 API - Posts
+  version: 1.0.0
+  description: Post creation and retrieval endpoints.
+
+paths:
+  /threads/{threadId}/posts:
+    post:
+      operationId: createPost
+      summary: Create a reply in a thread
+      description: |
+        Posts a reply to an existing thread. Supports text-only or multipart
+        form data with file attachment. Rate limited.
+      tags:
+        - posts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+                  description: Post content (HTML tags are sanitized)
+                sage:
+                  type: boolean
+                  default: false
+                  description: If true, does not bump the thread
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+                file:
+                  type: string
+                  format: binary
+                  description: Optional file attachment (image, webm, pdf)
+                sage:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Validation error (empty message, invalid content)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: User is banned or thread is closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /posts/{id}:
+    get:
+      operationId: getPost
+      summary: Get a single post
+      description: Retrieves a post by its ID.
+      tags:
+        - posts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Post found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        threadId:
+          type: string
+          format: uuid
+        message:
+          type: string
+        authorName:
+          type: string
+          example: Anonymous
+        tripcode:
+          type: string
+          nullable: true
+        file:
+          $ref: '#/components/schemas/FileAttachment'
+        createdAt:
+          type: string
+          format: date-time
+
+    FileAttachment:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        thumbnailUrl:
+          type: string
+          format: uri
+        url:
+          type: string
+          format: uri
+        size:
+          type: integer
+        width:
+          type: integer
+        height:
+          type: integer
+        mimeType:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string

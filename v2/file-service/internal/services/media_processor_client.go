@@ -34,11 +34,11 @@ type ThumbnailResponse struct {
 }
 
 type AllThumbnailsResponse struct {
-	Success bool              `json:"success"`
-	Small   *ThumbnailInfo    `json:"small"`
-	Medium  *ThumbnailInfo    `json:"medium"`
-	Large   *ThumbnailInfo    `json:"large"`
-	Error   string            `json:"error,omitempty"`
+	Success bool           `json:"success"`
+	Small   *ThumbnailInfo `json:"small"`
+	Medium  *ThumbnailInfo `json:"medium"`
+	Large   *ThumbnailInfo `json:"large"`
+	Error   string         `json:"error,omitempty"`
 }
 
 type ThumbnailInfo struct {

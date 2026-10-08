@@ -1,5 +1,5 @@
 import api from '@/api/axios';
-import { jwtDecode } from 'jose';
+import { decodeJwt } from 'jose';
 
 /**
  * Set the authorization token for API requests
@@ -27,7 +27,7 @@ export const removeAuthToken = (): void => {
  */
 export const isTokenExpired = (token: string): boolean => {
   try {
-    const decoded = jwtDecode(token);
+    const decoded = decodeJwt(token);
     const currentTime = Date.now() / 1000;
     
     if (typeof decoded.exp === 'number') {
@@ -47,8 +47,8 @@ export const isTokenExpired = (token: string): boolean => {
  */
 export const getRoleFromToken = (token: string): string | null => {
   try {
-    const decoded = jwtDecode(token);
-    return decoded.role as string || null;
+    const decoded = decodeJwt(token);
+    return (decoded.role as string) || null;
   } catch (error) {
     return null;
   }

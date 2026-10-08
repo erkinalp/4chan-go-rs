@@ -114,11 +114,11 @@ func init() {
 func PrometheusMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := prometheus.NewTimer(httpRequestDuration.WithLabelValues(c.Request.Method, c.FullPath()))
-		
+
 		c.Next()
-		
+
 		start.ObserveDuration()
-		
+
 		status := c.Writer.Status()
 		httpRequestsTotal.WithLabelValues(c.Request.Method, c.FullPath(), strconv.Itoa(status)).Inc()
 	}

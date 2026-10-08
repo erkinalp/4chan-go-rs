@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,8 +12,145 @@ import (
 	"strings"
 	"time"
 
+	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
 	"github.com/gin-gonic/gin"
 )
+
+// UserContext represents the authenticated user's identity
+type UserContext struct {
+	Sub         string    `json:"sub"`
+	Email       string    `json:"email,omitempty"`
+	Role        string    `json:"role,omitempty"`
+	Permissions []string  `json:"permissions,omitempty"`
+	CreatedAt   time.Time `json:"created_at,omitempty"`
+}
+
+// Claims represents JWT token claims
+type Claims struct {
+	Sub         string   `json:"sub"`
+	Email       string   `json:"email,omitempty"`
+	Role        string   `json:"role,omitempty"`
+	Iss         string   `json:"iss,omitempty"`
+	Exp         int64    `json:"exp"`
+	Iat         int64    `json:"iat"`
+	Permissions []string `json:"permissions,omitempty"`
+}
+
+// JWTAuthMiddleware creates a Gin middleware that validates JWT tokens
+func JWTAuthMiddleware(cfg config.JWTConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"statusCode": 401,
+				"message":    "Unauthorized",
+				"error":      "No authorization header provided",
+			})
+			c.Abort()
+			return
+		}
+
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || (parts[0] != "Bearer" && parts[0] != "GNAP") {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"statusCode": 401,
+				"message":    "Unauthorized",
+				"error":      "Invalid authorization format, expected 'Bearer <token>' or 'GNAP <token>'",
+			})
+			c.Abort()
+			return
+		}
+
+		token := parts[1]
+		claims, err := validateToken(token, cfg.SecretKey)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"statusCode": 401,
+				"message":    "Unauthorized",
+				"error":      err.Error(),
+			})
+			c.Abort()
+			return
+		}
+
+		// Check expiration
+		if claims.Exp > 0 && time.Now().Unix() > claims.Exp {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"statusCode": 401,
+				"message":    "Unauthorized",
+				"error":      "Token has expired",
+			})
+			c.Abort()
+			return
+		}
+
+		// Check issuer if configured
+		if cfg.Issuer != "" && claims.Iss != "" && claims.Iss != cfg.Issuer {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"statusCode": 401,
+				"message":    "Unauthorized",
+				"error":      "Invalid token issuer",
+			})
+			c.Abort()
+			return
+		}
+
+		// Store user context
+		userCtx := &UserContext{
+			Sub:         claims.Sub,
+			Email:       claims.Email,
+			Role:        claims.Role,
+			Permissions: claims.Permissions,
+		}
+		c.Set("user", userCtx)
+		c.Set("user_id", claims.Sub)
+
+		c.Next()
+	}
+}
+
+// validateToken parses and validates a JWT token using HMAC-SHA256
+func validateToken(tokenStr string, secret string) (*Claims, error) {
+	parts := strings.Split(tokenStr, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid token format")
+	}
+
+	// Verify signature (HMAC-SHA256)
+	signingInput := parts[0] + "." + parts[1]
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(signingInput))
+	expectedSig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+
+	if !hmac.Equal([]byte(parts[2]), []byte(expectedSig)) {
+		return nil, fmt.Errorf("invalid token signature")
+	}
+
+	// Decode payload
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid token payload encoding: %w", err)
+	}
+
+	var claims Claims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, fmt.Errorf("invalid token payload: %w", err)
+	}
+
+	return &claims, nil
+}
+
+// GetUserFromContext extracts the authenticated user from the gin context
+func GetUserFromContext(c *gin.Context) (*UserContext, bool) {
+	val, exists := c.Get("user")
+	if !exists {
+		return nil, false
+	}
+	user, ok := val.(*UserContext)
+	return user, ok
+}
+
+// --- GNAP Client (for external token introspection) ---
 
 type GNAPClient struct {
 	ServerURL    string
@@ -21,12 +160,11 @@ type GNAPClient struct {
 }
 
 type GNAPAccessToken struct {
-	Value     string                 `json:"value"`
-	Label     string                 `json:"label,omitempty"`
-	Manage    string                 `json:"manage,omitempty"`
-	Access    []GNAPAccessRight      `json:"access"`
-	ExpiresIn int                    `json:"expires_in,omitempty"`
-	Key       map[string]interface{} `json:"key,omitempty"`
+	Value     string            `json:"value"`
+	Label     string            `json:"label,omitempty"`
+	Manage    string            `json:"manage,omitempty"`
+	Access    []GNAPAccessRight `json:"access"`
+	ExpiresIn int               `json:"expires_in,omitempty"`
 }
 
 type GNAPAccessRight struct {
@@ -73,8 +211,8 @@ type GNAPSubjectID struct {
 }
 
 type GNAPInteract struct {
-	Start  []string     `json:"start"`
-	Finish *GNAPFinish  `json:"finish,omitempty"`
+	Start  []string    `json:"start"`
+	Finish *GNAPFinish `json:"finish,omitempty"`
 }
 
 type GNAPFinish struct {
@@ -118,14 +256,6 @@ type GNAPSubject struct {
 type GNAPError struct {
 	Code        string `json:"code"`
 	Description string `json:"description,omitempty"`
-}
-
-type UserContext struct {
-	Sub         string    `json:"sub"`
-	Email       string    `json:"email,omitempty"`
-	Role        string    `json:"role,omitempty"`
-	Permissions []string  `json:"permissions,omitempty"`
-	CreatedAt   time.Time `json:"created_at,omitempty"`
 }
 
 func NewGNAPClient(serverURL, clientKey, clientSecret string) *GNAPClient {

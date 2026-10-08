@@ -34,10 +34,10 @@ func HashPassword(password string) (string, error) {
 	// Format the hash: $argon2id$v=19$m=65536,t=3,p=4$salt$hash
 	encodedSalt := base64.RawStdEncoding.EncodeToString(salt)
 	encodedHash := base64.RawStdEncoding.EncodeToString(hash)
-	
+
 	result := fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
 		argon2Memory, argon2Time, argon2Threads, encodedSalt, encodedHash)
-	
+
 	return result, nil
 }
 
@@ -56,7 +56,7 @@ func VerifyPassword(password, encodedHash string) (bool, error) {
 	if subtle.ConstantTimeCompare(hash, otherHash) == 1 {
 		return true, nil
 	}
-	
+
 	return false, nil
 }
 

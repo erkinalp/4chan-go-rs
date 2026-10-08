@@ -2,68 +2,122 @@
 
 This directory contains the modernized version of the application, implementing a modern architecture based on microservices and micro-frontends.
 
+## Quick Start
+
+```bash
+# Start the full development stack
+cd infrastructure
+docker compose up -d
+
+# Run integration tests
+cd ../tests/integration
+npm install
+npm test
+
+# Run load tests (requires k6)
+cd ../load
+./run-load-tests.sh
+```
+
 ## Project Structure
 
-- **api-core** - Central API core implemented with TypeScript/NestJS
-  - API Gateway and service orchestration
-  - Authentication and authorization management
-  - Implementation of core business logic
+### Services
 
-- **file-service** - File management service implemented in Go
-  - Secure file validation
+- **api-core** — Central API (TypeScript/NestJS)
+  - REST API gateway and service orchestration
+  - JWT authentication and role-based authorization
+  - Business logic for boards, threads, posts, moderation
+
+- **file-service** — File management (Go)
+  - File upload validation and virus scanning (ClamAV)
   - Image transformation and optimization
-  - Efficient storage in S3/MinIO
+  - S3/MinIO storage with deduplication
 
-- **media-processor** - Advanced media processor implemented in Rust
-  - Forensic image analysis
-  - High-performance processing
-  - Prohibited content detection
+- **media-processor** — Media processing (Rust)
+  - Thumbnail generation and image analysis
+  - High-performance concurrent processing
+  - Banned hash detection
 
-- **frontend-legacy** - Traditional React implementation of the frontend
-  - Support for classic themes
-  - Responsive interface
-  - Reusable React components
-
-- **frontend-modern** - Advanced implementation with modern architecture
+- **frontend-modern** — Primary web frontend (React/Vite)
   - State management with Redux Toolkit
   - Integration with Web Components
-  - Advanced performance optimization
+  - Performance-optimized SPA
 
-- **microfrontends** - Complete implementation of micro-frontends
-  - shell - Main application that orchestrates the micro-frontends
-  - board-viewer - Board and thread visualization
-  - catalog-viewer - Catalog view
-  - post-creator - Post creation
-  - auth - Authentication management
-  - media-viewer - Media visualization
-  - moderation - Moderation tools
+- **microfrontends** — Modular UI components
+  - shell — Host application orchestrating micro-frontends
+  - board-viewer — Board and thread visualization
+  - post-creator — Post composition with file upload
+  - auth — Authentication flows
+  - moderation — Moderation tools panel
 
-- **api-specs** - API definitions in OpenAPI/Swagger format
-  - Complete endpoint documentation
-  - Specifications for client generation
+### Supporting
 
-- **docs** - Technical documentation
-  - Architecture and design
-  - Security models
-
-- **infrastructure** - Infrastructure configuration
-  - Docker and Kubernetes
-  - CI/CD
-  - Automation scripts
+- **api-specs** — OpenAPI 3.0 specifications for all endpoints
+- **docs** — Technical documentation (deployment, migration, API reference, moderation)
+- **infrastructure** — Docker Compose, Kubernetes manifests, Nginx gateway, monitoring
+- **tests** — Integration, load, and security test suites
+- **migrations** — Legacy MySQL → PostgreSQL migration scripts
 
 ## Main Technologies
 
-- Backend: TypeScript (NestJS), Go, Rust
-- Frontend: React, TypeScript, Web Components
+- Backend: TypeScript (NestJS), Go (Gin), Rust (Actix-web)
+- Frontend: React, TypeScript, Vite, Web Components
 - Storage: PostgreSQL, Redis, S3/MinIO
-- Infrastructure: Docker, Kubernetes
+- Infrastructure: Docker, Kubernetes, Nginx/OpenResty (Lua)
+- Monitoring: Prometheus, Grafana
+- Testing: Jest, k6, Supertest
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [Deployment Guide](docs/deployment-guide.md) | Production deployment steps |
+| [Migration Guide](docs/migration-guide.md) | Legacy to v2 migration |
+| [API Reference](docs/api-reference.md) | All API endpoints with examples |
+| [Moderator Guide](docs/moderator-guide.md) | Moderation tools usage |
+| [Architecture](docs/architecture/) | System design documentation |
+| [Security](docs/security/) | Security model and practices |
 
 ## Development
 
-Each component has its own README with specific instructions for development, testing, and deployment.
+Each service has its own README with specific instructions:
 
 ```bash
-# To run the complete stack in development
-cd infrastructure
-docker compose up -d
+# API Core (NestJS)
+cd api-core && npm install && npm run start:dev
+
+# File Service (Go)
+cd file-service && go run cmd/server/main.go
+
+# Media Processor (Rust)
+cd media-processor && cargo run
+
+# Frontend
+cd frontend-modern && npm install && npm run dev
 ```
+
+## Testing
+
+```bash
+# Integration tests (requires Docker for postgres/redis/minio)
+cd tests/integration
+npm install
+npm test
+
+# Security tests
+cd tests/security
+npm install
+npm test
+
+# Load tests (requires k6: https://k6.io)
+cd tests/load
+./run-load-tests.sh
+```
+
+## Monitoring
+
+Grafana dashboards and Prometheus alerting rules are pre-configured:
+
+- **Service Health** dashboard — Up/down status, request rates, error rates
+- **Performance** dashboard — P50/P95/P99 latency, throughput, connection pools
+- **SLO Alerts** — Availability <99.9%, latency P95 >200ms, error rate >1%

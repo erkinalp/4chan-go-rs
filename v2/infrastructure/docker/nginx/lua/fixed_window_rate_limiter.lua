@@ -115,8 +115,14 @@ function _M.check_rate_limit()
     
     local red = connect_redis()
     if not red then
-        ngx.log(ngx.ERR, "Redis unavailable, allowing request")
-        return
+        ngx.log(ngx.ERR, "Redis unavailable, denying request (fail-closed)")
+        ngx.status = 503
+        ngx.header.content_type = "application/json"
+        ngx.say(cjson.encode({
+            error = "Service temporarily unavailable",
+            message = "Rate limiter backend unavailable"
+        }))
+        return ngx.exit(503)
     end
     
     if is_blocked_and_extend(red, ip, limit_type, config.window) then
@@ -137,14 +143,22 @@ function _M.check_rate_limit()
     local window_start = calculate_window_start(current_time, user_offset, config.window, ip, limit_type, red)
     local count_key = "rate_limit:count:" .. limit_type .. ":" .. ip .. ":" .. window_start
     
-    local current_count = red:get(count_key)
-    if current_count == ngx.null then
-        current_count = 0
-    else
-        current_count = tonumber(current_count) or 0
+    -- Use atomic INCR to avoid race conditions between concurrent requests
+    local current_count, err = red:incr(count_key)
+    if not current_count then
+        ngx.log(ngx.ERR, "Failed to increment rate limit counter: ", err)
+        red:set_keepalive(10000, 100)
+        return
     end
     
-    current_count = current_count + 1
+    -- Set TTL on first increment (when count becomes 1)
+    if current_count == 1 then
+        local window_end = window_start + config.window
+        local ttl = window_end - current_time
+        if ttl > 0 then
+            red:expire(count_key, ttl)
+        end
+    end
     
     if current_count > config.requests then
         block_ip(red, ip, limit_type, config.window)
@@ -164,8 +178,6 @@ function _M.check_rate_limit()
     end
     
     local window_end = window_start + config.window
-    local ttl = window_end - current_time
-    red:setex(count_key, ttl, current_count)
     
     ngx.header["X-RateLimit-Type"] = limit_type
     ngx.header["X-RateLimit-Limit"] = config.requests

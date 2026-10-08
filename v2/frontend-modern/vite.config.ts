@@ -64,21 +64,16 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: [
-            'react', 
-            'react-dom', 
-            'react-router-dom', 
-            '@reduxjs/toolkit', 
-            'react-redux',
-            '@tanstack/react-query'
-          ],
-          ui: [
-            'react-icons', 
-            'framer-motion',
-            'react-tooltip',
-            'styled-components'
-          ]
+        manualChunks(id: string) {
+          const vendorLibs = [
+            'react', 'react-dom', 'react-router-dom',
+            '@reduxjs/toolkit', 'react-redux', '@tanstack/react-query',
+          ];
+          const uiLibs = [
+            'react-icons', 'framer-motion', 'react-tooltip', 'styled-components',
+          ];
+          if (vendorLibs.some((lib) => id.includes(`node_modules/${lib}/`))) return 'vendor';
+          if (uiLibs.some((lib) => id.includes(`node_modules/${lib}/`))) return 'ui';
         }
       }
     }

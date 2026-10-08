@@ -11,7 +11,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Módelo de usuario (administradores, moderadores, etc.)
+// MÃ³delo de usuario (administradores, moderadores, etc.)
 model User {
   id             String         @id @default(uuid())
   username       String         @unique
@@ -41,9 +41,9 @@ model RefreshToken {
   @@index([userId])
 }
 
-// Módelo para tablones
+// MÃ³delo para tablones
 model Board {
-  id                String   @id // Código corto del tablón (ej: "b", "pol")
+  id                String   @id // CÃ³digo corto del tablÃ³n (ej: "b", "pol")
   name              String
   description       String?
   isNsfw            Boolean  @default(false)
@@ -64,7 +64,7 @@ model Board {
   @@index([categoryId])
 }
 
-// Categorías de tablones
+// CategorÃ­as de tablones
 model Category {
   id          String   @id @default(uuid())
   name        String   @unique
@@ -75,7 +75,7 @@ model Category {
   boards      Board[]
 }
 
-// Asignación de moderadores a tablones
+// AsignaciÃ³n de moderadores a tablones
 model ModeratorBoard {
   id        String   @id @default(uuid())
   userId    String
@@ -96,7 +96,7 @@ model Thread {
   isSticky        Boolean   @default(false)
   isLocked        Boolean   @default(false)
   isCyclic        Boolean   @default(false) // Para hilos que eliminan posts antiguos
-  cycleLimit      Int?      // Límite para threads cíclicos
+  cycleLimit      Int?      // LÃ­mite para threads cÃ­clicos
   bumpedAt        DateTime  @default(now())
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -114,7 +114,7 @@ model Thread {
 // Modelo para posts
 model Post {
   id              String    @id @default(uuid())
-  postNumber      Int       // Número secuencial visible en el board
+  postNumber      Int       // NÃºmero secuencial visible en el board
   name            String?   @default("Anonymous") @db.VarChar(100)
   tripcode        String?   @db.VarChar(100)
   message         String?   @db.Text
@@ -133,22 +133,23 @@ model Post {
   @@index([ipHash])
 }
 
-// Modelo para archivos (imágenes, videos, etc.)
+// Modelo para archivos (imÃ¡genes, videos, etc.)
 model File {
   id              String    @id @default(uuid())
   filename        String    // Nombre original del archivo
   storedFilename  String    @unique // Nombre en el sistema
-  filesize        Int       // Tamaño en bytes
-  width           Int?      // Ancho de imagen/video en píxeles
-  height          Int?      // Alto de imagen/video en píxeles
+  filesize        Int       // TamaÃ±o en bytes
+  width           Int?      // Ancho de imagen/video en pÃ­xeles
+  height          Int?      // Alto de imagen/video en pÃ­xeles
   thumbnailFilename String  // Nombre de la miniatura
   mimeType        String    // Tipo MIME
-  md5Hash         String    // Hash MD5 para detección de duplicados
-  sha256Hash      String    // Hash SHA256 para verificación de integridad
+  md5Hash         String    // Hash MD5 para detecciÃ³n de duplicados
+  sha256Hash      String    // Hash SHA256 para verificaciÃ³n de integridad
   isSpoilered     Boolean   @default(false)
   createdAt       DateTime  @default(now())
   post            Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId          String
+  processingQueue ProcessingQueue[]
 
   @@index([md5Hash])
   @@index([postId])
@@ -161,7 +162,7 @@ model Report {
   additionalInfo String?    @db.Text
   ipHash       String       // Hash de IP anonimizado
   isResolved   Boolean      @default(false)
-  resolvedBy   String?      // ID del moderador que resolvió el reporte
+  resolvedBy   String?      // ID del moderador que resolviÃ³ el reporte
   createdAt    DateTime     @default(now())
   resolvedAt   DateTime?
   post         Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -176,17 +177,17 @@ model Report {
   @@index([isResolved])
 }
 
-// Modelo para registro de auditoría
+// Modelo para registro de auditorÃ­a
 model AuditLog {
   id           String     @id @default(uuid())
-  action       String     // Tipo de acción realizada
+  action       String     // Tipo de acciÃ³n realizada
   entityType   String     // Tipo de entidad afectada (thread, post, etc.)
   entityId     String     // ID de la entidad afectada
   details      Json?      // Detalles adicionales como JSON
-  ipAddress    String?    // IP de la acción (sólo para moderadores autenticados)
+  ipAddress    String?    // IP de la acciÃ³n (sÃ³lo para moderadores autenticados)
   createdAt    DateTime   @default(now())
   user         User?      @relation(fields: [userId], references: [id])
-  userId       String?    // ID del usuario/moderador (nulo para acciones anónimas)
+  userId       String?    // ID del usuario/moderador (nulo para acciones anÃ³nimas)
   
   @@index([userId])
   @@index([action])
@@ -215,7 +216,7 @@ model Ban {
 // Modelo para filtros de palabras
 model WordFilter {
   id           String     @id @default(uuid())
-  pattern      String     // Patrón a filtrar
+  pattern      String     // PatrÃ³n a filtrar
   replacement  String     // Texto de reemplazo
   isRegex      Boolean    @default(false)
   isActive     Boolean    @default(true)
@@ -231,10 +232,10 @@ model WordFilter {
 // Modelo para captchas
 model Captcha {
   id           String     @id @default(uuid())
-  solution     String     // Solución hasheada
+  solution     String     // SoluciÃ³n hasheada
   expiresAt    DateTime
   createdAt    DateTime   @default(now())
-  ipHash       String     // Hash de IP que solicitó el captcha
+  ipHash       String     // Hash de IP que solicitÃ³ el captcha
   isUsed       Boolean    @default(false)
   
   @@index([expiresAt])
@@ -262,4 +263,38 @@ enum AppealStatus {
   PENDING
   APPROVED
   DENIED
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model ProcessingQueue {
+  id          String           @id @default(uuid())
+  fileId      String
+  status      ProcessingStatus @default(PENDING)
+  priority    Int              @default(0)
+  attempts    Int              @default(0)
+  maxAttempts Int              @default(3)
+  error       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  completedAt DateTime?
+  file        File             @relation(fields: [fileId], references: [id])
+
+  @@index([status, priority])
+}
+
+model BannedHash {
+  id        String   @id @default(uuid())
+  hash      String   @unique
+  hashType  String   @default("md5")
+  reason    String?
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  @@index([hash])
 }

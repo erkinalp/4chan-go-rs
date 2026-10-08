@@ -1,8 +1,6 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use sqlx::{postgres::PgRow, Row};
 use uuid::Uuid;
-
 
 use crate::models::file::{File, FileStats};
 use crate::repositories::postgres_repository::PostgresRepository;
@@ -27,24 +25,22 @@ impl FileRepository {
 
         let result = sqlx::query(query)
             .bind(file_id)
-            .map(|row: PgRow| {
-                File {
-                    id: row.get("id"),
-                    filename: row.get("filename"),
-                    stored_filename: row.get("stored_filename"),
-                    filesize: row.get("filesize"),
-                    width: row.get("width"),
-                    height: row.get("height"),
-                    thumbnail_filename: row.get("thumbnail_filename"),
-                    mime_type: row.get("mime_type"),
-                    md5_hash: row.get("md5_hash"),
-                    sha256_hash: row.get("sha256_hash"),
-                    is_spoilered: row.get("is_spoilered"),
-                    created_at: row.get("created_at"),
-                    post_id: row.get("post_id"),
-                    file_url: format!("/files/{}/content", row.get::<Uuid, _>("id")),
-                    thumbnail_url: format!("/files/{}/thumbnail", row.get::<Uuid, _>("id")),
-                }
+            .map(|row: PgRow| File {
+                id: row.get("id"),
+                filename: row.get("filename"),
+                stored_filename: row.get("stored_filename"),
+                filesize: row.get("filesize"),
+                width: row.get("width"),
+                height: row.get("height"),
+                thumbnail_filename: row.get("thumbnail_filename"),
+                mime_type: row.get("mime_type"),
+                md5_hash: row.get("md5_hash"),
+                sha256_hash: row.get("sha256_hash"),
+                is_spoilered: row.get("is_spoilered"),
+                created_at: row.get("created_at"),
+                post_id: row.get("post_id"),
+                file_url: format!("/files/{}/content", row.get::<Uuid, _>("id")),
+                thumbnail_url: format!("/files/{}/thumbnail", row.get::<Uuid, _>("id")),
             })
             .fetch_optional(&self.postgres.pool)
             .await?;
@@ -64,24 +60,22 @@ impl FileRepository {
 
         let result = sqlx::query(query)
             .bind(md5_hash)
-            .map(|row: PgRow| {
-                File {
-                    id: row.get("id"),
-                    filename: row.get("filename"),
-                    stored_filename: row.get("stored_filename"),
-                    filesize: row.get("filesize"),
-                    width: row.get("width"),
-                    height: row.get("height"),
-                    thumbnail_filename: row.get("thumbnail_filename"),
-                    mime_type: row.get("mime_type"),
-                    md5_hash: row.get("md5_hash"),
-                    sha256_hash: row.get("sha256_hash"),
-                    is_spoilered: row.get("is_spoilered"),
-                    created_at: row.get("created_at"),
-                    post_id: row.get("post_id"),
-                    file_url: format!("/files/{}/content", row.get::<Uuid, _>("id")),
-                    thumbnail_url: format!("/files/{}/thumbnail", row.get::<Uuid, _>("id")),
-                }
+            .map(|row: PgRow| File {
+                id: row.get("id"),
+                filename: row.get("filename"),
+                stored_filename: row.get("stored_filename"),
+                filesize: row.get("filesize"),
+                width: row.get("width"),
+                height: row.get("height"),
+                thumbnail_filename: row.get("thumbnail_filename"),
+                mime_type: row.get("mime_type"),
+                md5_hash: row.get("md5_hash"),
+                sha256_hash: row.get("sha256_hash"),
+                is_spoilered: row.get("is_spoilered"),
+                created_at: row.get("created_at"),
+                post_id: row.get("post_id"),
+                file_url: format!("/files/{}/content", row.get::<Uuid, _>("id")),
+                thumbnail_url: format!("/files/{}/thumbnail", row.get::<Uuid, _>("id")),
             })
             .fetch_optional(&self.postgres.pool)
             .await?;
@@ -101,7 +95,7 @@ impl FileRepository {
         "#;
 
         sqlx::query(query)
-            .bind(&file.id)
+            .bind(file.id)
             .bind(&file.filename)
             .bind(&file.stored_filename)
             .bind(file.filesize)
@@ -113,7 +107,7 @@ impl FileRepository {
             .bind(&file.sha256_hash)
             .bind(file.is_spoilered)
             .bind(file.created_at)
-            .bind(&file.post_id)
+            .bind(file.post_id)
             .execute(&self.postgres.pool)
             .await?;
 
@@ -122,12 +116,12 @@ impl FileRepository {
 
     pub async fn delete_file(&self, file_id: &Uuid) -> Result<bool> {
         let query = "DELETE FROM files WHERE id = $1";
-        
+
         let result = sqlx::query(query)
             .bind(file_id)
             .execute(&self.postgres.pool)
             .await?;
-        
+
         Ok(result.rows_affected() > 0)
     }
 
@@ -173,13 +167,14 @@ impl FileRepository {
         &self,
         older_than_days: i32,
         mime_types: Option<&Vec<String>>,
-        except_board_ids: Option<&Vec<Uuid>>
+        except_board_ids: Option<&Vec<Uuid>>,
     ) -> Result<(i32, i64)> {
         let mut query = r#"
             SELECT COUNT(*) as file_count, COALESCE(SUM(filesize), 0) as total_size
             FROM files
             WHERE created_at < NOW() - INTERVAL '$1 days'
-        "#.to_string();
+        "#
+        .to_string();
 
         if let Some(types) = mime_types {
             if !types.is_empty() {
@@ -189,12 +184,13 @@ impl FileRepository {
 
         if let Some(board_ids) = except_board_ids {
             if !board_ids.is_empty() {
-                query.push_str(" AND post_id NOT IN (SELECT id FROM posts WHERE board_id = ANY($3))");
+                query.push_str(
+                    " AND post_id NOT IN (SELECT id FROM posts WHERE board_id = ANY($3))",
+                );
             }
         }
 
-        let mut q = sqlx::query_as::<_, (i32, i64)>(&query)
-            .bind(older_than_days);
+        let mut q = sqlx::query_as::<_, (i32, i64)>(&query).bind(older_than_days);
 
         if let Some(types) = mime_types {
             if !types.is_empty() {
@@ -218,13 +214,14 @@ impl FileRepository {
         older_than_days: i32,
         mime_types: Option<&Vec<String>>,
         except_board_ids: Option<&Vec<Uuid>>,
-        s3_repo: Option<&crate::repositories::s3_repository::S3Repository>
+        s3_repo: Option<&crate::repositories::s3_repository::S3Repository>,
     ) -> Result<(i32, i64)> {
         let mut query = r#"
             SELECT id, stored_filename
             FROM files
             WHERE created_at < NOW() - INTERVAL '$1 days'
-        "#.to_string();
+        "#
+        .to_string();
 
         if let Some(types) = mime_types {
             if !types.is_empty() {
@@ -234,12 +231,13 @@ impl FileRepository {
 
         if let Some(board_ids) = except_board_ids {
             if !board_ids.is_empty() {
-                query.push_str(" AND post_id NOT IN (SELECT id FROM posts WHERE board_id = ANY($3))");
+                query.push_str(
+                    " AND post_id NOT IN (SELECT id FROM posts WHERE board_id = ANY($3))",
+                );
             }
         }
 
-        let mut q = sqlx::query_as::<_, (Uuid, Option<String>)>(&query)
-            .bind(older_than_days);
+        let mut q = sqlx::query_as::<_, (Uuid, Option<String>)>(&query).bind(older_than_days);
 
         if let Some(types) = mime_types {
             if !types.is_empty() {
@@ -254,9 +252,9 @@ impl FileRepository {
         }
 
         let files_to_delete = q.fetch_all(&self.postgres.pool).await?;
-        
+
         let mut deleted_count = 0;
-        let mut freed_space = 0;
+        let freed_space = 0;
 
         if let Some(s3) = s3_repo {
             for (file_id, stored_filename) in &files_to_delete {
