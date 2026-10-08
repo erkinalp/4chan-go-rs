@@ -549,3 +549,84 @@ pub async fn purge_files(
 
     Ok(HttpResponse::Ok().json(response))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ext_matches_mime_accepts_expected_pairs() {
+        let cases = [
+            (".jpg", "image/jpeg"),
+            (".jpeg", "image/jpeg"),
+            (".png", "image/png"),
+            (".gif", "image/gif"),
+            (".webp", "image/webp"),
+            (".mp4", "video/mp4"),
+            (".webm", "video/webm"),
+            (".pdf", "application/pdf"),
+            (".zip", "application/zip"),
+            (".7z", "application/x-7z-compressed"),
+        ];
+        for (ext, mime) in cases {
+            assert!(ext_matches_mime(ext, mime), "{ext} vs {mime}");
+        }
+    }
+
+    #[test]
+    fn ext_matches_mime_rejects_mismatches() {
+        let cases = [
+            (".exe", "image/jpeg"),
+            (".png", "image/jpeg"),
+            ("", "image/png"),
+            (".jpg", "video/mp4"),
+            (".jpeg", "application/pdf"),
+        ];
+        for (ext, mime) in cases {
+            assert!(!ext_matches_mime(ext, mime), "{ext} vs {mime}");
+        }
+    }
+
+    #[test]
+    fn is_allowed_mime_whitelist() {
+        for mime in [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "video/mp4",
+            "video/webm",
+            "application/pdf",
+            "application/zip",
+            "application/x-7z-compressed",
+        ] {
+            assert!(is_allowed_mime(mime), "{mime}");
+        }
+        for mime in [
+            "application/x-executable",
+            "application/x-dosexec",
+            "text/html",
+            "application/javascript",
+            "image/svg+xml",
+            "",
+        ] {
+            assert!(!is_allowed_mime(mime), "{mime}");
+        }
+    }
+
+    #[test]
+    fn looks_executable_flags_dangerous_mimes() {
+        for mime in [
+            "application/x-executable",
+            "application/x-executable; charset=binary",
+            "application/x-dosexec",
+            "application/x-mach-binary",
+            "application/x-sharedlib",
+        ] {
+            assert!(looks_executable(mime), "{mime}");
+        }
+        for mime in ["application/pdf", "image/png", "application/zip", ""] {
+            assert!(!looks_executable(mime), "{mime}");
+        }
+    }
+}

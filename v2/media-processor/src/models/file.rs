@@ -178,3 +178,108 @@ pub struct FilePurgeResponse {
     /// Estimated space to be freed in bytes
     pub estimated_space_to_free: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_file() -> File {
+        File {
+            id: Uuid::new_v4(),
+            filename: "cat.jpg".to_string(),
+            stored_filename: None,
+            filesize: 1234,
+            width: None,
+            height: None,
+            thumbnail_filename: None,
+            mime_type: "image/jpeg".to_string(),
+            md5_hash: "d41d8cd98f00b204e9800998ecf8427e".to_string(),
+            sha256_hash: None,
+            is_spoilered: false,
+            created_at: Utc::now(),
+            post_id: None,
+            file_url: "http://files/f1".to_string(),
+            thumbnail_url: "http://files/f1/thumb".to_string(),
+        }
+    }
+
+    #[test]
+    fn file_json_omits_none_fields() {
+        let json = serde_json::to_value(&sample_file()).unwrap();
+        for key in [
+            "stored_filename",
+            "width",
+            "height",
+            "thumbnail_filename",
+            "sha256_hash",
+            "post_id",
+        ] {
+            assert!(json.get(key).is_none(), "{key} should be omitted");
+        }
+        assert_eq!(json["filename"], "cat.jpg");
+        assert_eq!(json["filesize"], 1234);
+        assert_eq!(json["is_spoilered"], false);
+    }
+
+    #[test]
+    fn file_json_includes_set_fields() {
+        let mut f = sample_file();
+        f.stored_filename = Some("s.jpg".to_string());
+        f.width = Some(800);
+        f.height = Some(600);
+        f.post_id = Some(Uuid::nil());
+        let json = serde_json::to_value(&f).unwrap();
+        assert_eq!(json["stored_filename"], "s.jpg");
+        assert_eq!(json["width"], 800);
+        assert_eq!(json["post_id"], Uuid::nil().to_string());
+    }
+
+    #[test]
+    fn file_check_response_omits_file_when_absent() {
+        let resp = FileCheckResponse {
+            exists: false,
+            file: None,
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["exists"], false);
+        assert!(json.get("file").is_none());
+    }
+
+    #[test]
+    fn file_purge_request_defaults_dry_run_false() {
+        let req: FilePurgeRequest =
+            serde_json::from_str(r#"{"older_than_days": 30}"#).unwrap();
+        assert_eq!(req.older_than_days, 30);
+        assert!(!req.dry_run);
+        assert!(req.mime_types.is_none());
+        assert!(req.except_board_ids.is_none());
+    }
+
+    #[test]
+    fn banned_hashes_response_serializes() {
+        let resp = BannedHashesResponse {
+            data: vec!["abc".to_string()],
+            updated_at: Utc::now(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["data"], serde_json::json!(["abc"]));
+        assert!(json.get("updated_at").is_some());
+    }
+
+    #[test]
+    fn file_stats_serializes() {
+        let mut by_type = std::collections::HashMap::new();
+        by_type.insert("image/png".to_string(), 7);
+        let stats = FileStats {
+            total_files: 10,
+            total_size: 5000,
+            files_by_type: by_type,
+            average_file_size: 500,
+            files_last_day: 2,
+            files_last_week: 9,
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        assert_eq!(json["total_files"], 10);
+        assert_eq!(json["files_by_type"]["image/png"], 7);
+    }
+}

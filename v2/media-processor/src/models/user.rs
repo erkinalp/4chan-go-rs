@@ -299,3 +299,93 @@ impl RefreshToken {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_display_uppercase() {
+        assert_eq!(Role::User.to_string(), "USER");
+        assert_eq!(Role::Janitor.to_string(), "JANITOR");
+        assert_eq!(Role::Moderator.to_string(), "MODERATOR");
+        assert_eq!(Role::Admin.to_string(), "ADMIN");
+    }
+
+    #[test]
+    fn role_try_from_roundtrip() {
+        for role in [Role::User, Role::Janitor, Role::Moderator, Role::Admin] {
+            let parsed = Role::try_from(role.to_string()).unwrap();
+            assert_eq!(parsed, role);
+        }
+    }
+
+    #[test]
+    fn role_try_from_case_insensitive() {
+        assert_eq!(Role::try_from("admin".to_string()).unwrap(), Role::Admin);
+        assert_eq!(Role::try_from("Moderator".to_string()).unwrap(), Role::Moderator);
+    }
+
+    #[test]
+    fn role_try_from_unknown_errors() {
+        assert!(Role::try_from("SUPERUSER".to_string()).is_err());
+        assert!(Role::try_from("".to_string()).is_err());
+    }
+
+    fn sample_user() -> User {
+        User {
+            id: Uuid::new_v4(),
+            username: "anon".to_string(),
+            email: "a@b.com".to_string(),
+            password_hash: "secret-hash".to_string(),
+            role: Role::Moderator,
+            is_active: true,
+            is_banned: false,
+            two_factor_auth: false,
+            two_factor_secret: Some("totp".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_login_at: None,
+        }
+    }
+
+    #[test]
+    fn user_safe_from_drops_credentials() {
+        let user = sample_user();
+        let safe = UserSafe::from(user.clone());
+        assert_eq!(safe.id, user.id);
+        assert_eq!(safe.username, user.username);
+        assert_eq!(safe.role, user.role);
+        // UserSafe has no password_hash / two_factor_secret fields by construction.
+        let json = serde_json::to_value(&safe).unwrap();
+        assert!(json.get("password_hash").is_none());
+        assert!(json.get("two_factor_secret").is_none());
+        assert!(json.get("email").is_none());
+    }
+
+    #[test]
+    fn user_json_never_serializes_secrets() {
+        let json = serde_json::to_value(&sample_user()).unwrap();
+        assert!(json.get("password_hash").is_none(), "password_hash leaked");
+        assert!(
+            json.get("two_factor_secret").is_none(),
+            "two_factor_secret leaked"
+        );
+        assert_eq!(json["username"], "anon");
+    }
+
+    #[test]
+    fn refresh_token_roundtrip() {
+        let rt = RefreshToken {
+            id: Uuid::new_v4(),
+            token: "tok".to_string(),
+            user_id: Uuid::new_v4(),
+            expires_at: Utc::now(),
+            created_at: Utc::now(),
+        };
+        let json = serde_json::to_string(&rt).unwrap();
+        let back: RefreshToken = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, rt.id);
+        assert_eq!(back.token, "tok");
+    }
+}

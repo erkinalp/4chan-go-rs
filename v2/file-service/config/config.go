@@ -135,6 +135,30 @@ func Load() (*Config, error) {
 	// Read configuration from environment variables
 	viper.AutomaticEnv()
 
+	// viper's AutomaticEnv only unmarshals keys it already knows about
+	// (via SetDefault, config files, or explicit Set). Keys that exist only
+	// as environment variables must be bound explicitly or they are
+	// silently dropped.
+	for _, key := range []string{
+		"DATABASE_URL",
+		"REDIS_HOST",
+		"REDIS_PASSWORD",
+		"MINIO_ENDPOINT",
+		"MINIO_ACCESS_KEY",
+		"MINIO_SECRET_KEY",
+		"MINIO_BUCKET",
+		"JWT_SECRET",
+		"JWT_REFRESH_SECRET",
+		"CAPTCHA_SECRET_KEY",
+		"CAPTCHA_SITE_KEY",
+		"CAPTCHA_VERIFY_URL",
+		"CORS_ALLOW_ORIGINS",
+	} {
+		if err := viper.BindEnv(key); err != nil {
+			return nil, fmt.Errorf("failed to bind env var %s: %w", key, err)
+		}
+	}
+
 	// Parse Neon database URL if using a standard URL format
 	if os.Getenv("DATABASE_URL") != "" {
 		viper.Set("DATABASE_URL", os.Getenv("DATABASE_URL"))
