@@ -8,21 +8,24 @@ use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod config;
-mod handlers;
-mod middleware;
-mod routes;
 mod error;
+mod handlers;
+mod metrics;
+mod middleware;
 mod models;
 mod repositories;
+mod routes;
 mod services;
 mod utils;
 
 use config::Config;
+use metrics::MediaMetrics;
 use repositories::{
-    postgres_repository::PostgresRepository, redis_repository::RedisRepository,
-    s3_repository::S3Repository,
+    file_repository::FileRepository, postgres_repository::PostgresRepository,
+    redis_repository::RedisRepository, s3_repository::S3Repository,
 };
 use services::malware_scanner::{ClamAVScanner, MalwareScannerConfig as ScannerCfg};
+use services::ThumbnailGenerator;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -75,6 +78,10 @@ async fn main() -> std::io::Result<()> {
         .build()
         .expect("Failed to build prometheus metrics");
 
+    // Custom media-processing metrics share the middleware's registry, so they
+    // are exported on the same /metrics endpoint
+    let media_metrics = web::Data::new(MediaMetrics::new(&prometheus.registry));
+
     let scanner = ClamAVScanner::new(ScannerCfg {
         enabled: config.malware_scanner.enabled,
         host: config.malware_scanner.host.clone(),
@@ -109,9 +116,14 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(web::Data::new(scanner))
             .app_data(web::Data::new(app_config.clone()))
-            .app_data(web::Data::new(postgres_repo))
+            .app_data(web::Data::new(postgres_repo.clone()))
+            .app_data(web::Data::new(FileRepository::new(postgres_repo)))
             .app_data(web::Data::new(redis_repo))
             .app_data(web::Data::new(s3_repo))
+            .app_data(web::Data::new(ThumbnailGenerator::default()))
+            .app_data(media_metrics.clone())
+            // Root-level probe endpoints for k8s/docker health checks
+            .configure(routes::health::configure_probes)
             .service(
                 web::scope(&format!(
                     "{}/{}",

@@ -36,7 +36,7 @@ image = "0.25.6"
 md5 = "0.7.0"
 sha2 = "0.10.9"
 actix-web-prom = { version = "0.9.0", default-features = false }  # confirmed: using actix-web-prom (not deprecated actix-web-prometheus)
-prometheus = { version = "0.14.0", features = ["process"], default-features = false }
+prometheus = { version = "0.13.4", features = ["process"], default-features = false }  # must match actix-web-prom 0.9's prometheus version (0.13.x) to share its registry
 base64 = "0.22.1"
 log = "0.4.27"
 derive_more = { version = "2.0.1", features = ["display"] }

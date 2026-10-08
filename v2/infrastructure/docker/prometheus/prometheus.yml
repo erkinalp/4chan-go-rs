@@ -4,6 +4,7 @@ global:
 
 rule_files:
   - "rules/*.yml"
+  - "alerts/*.yml"
 
 alerting:
   alertmanagers:
@@ -15,27 +16,30 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
+  # api-core (NestJS) exposes prom-client metrics at /metrics (unprefixed)
   - job_name: '4chan-api'
     static_configs:
-      - targets: ['api-service:8080']
+      - targets: ['api:3000']
     metrics_path: '/metrics'
     scrape_interval: 30s
 
   - job_name: '4chan-auth'
     static_configs:
-      - targets: ['auth-service:8081']
+      - targets: ['auth:3000']
     metrics_path: '/metrics'
     scrape_interval: 30s
 
+  # file-service (Go/Gin) exposes client_golang metrics at /metrics
   - job_name: '4chan-files'
     static_configs:
-      - targets: ['files-service:8082']
+      - targets: ['files:8080']
     metrics_path: '/metrics'
     scrape_interval: 30s
 
+  # media-processor (Rust/actix-web-prom) exposes metrics at /metrics
   - job_name: '4chan-media-processor'
     static_configs:
-      - targets: ['media-processor:8083']
+      - targets: ['media-processor:8081']
     metrics_path: '/metrics'
     scrape_interval: 30s
 
@@ -51,7 +55,7 @@ scrape_configs:
 
   - job_name: 'minio'
     static_configs:
-      - targets: ['minio-service:9000']
+      - targets: ['minio:9000']
     metrics_path: '/minio/v2/metrics/cluster'
     scrape_interval: 30s
 
@@ -60,3 +64,35 @@ scrape_configs:
       - targets: ['nginx:80']
     metrics_path: '/metrics'
     scrape_interval: 15s
+
+  # OTEL collector: its own telemetry + the Prometheus exporter re-exporting
+  # received OTLP metrics
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8888']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'otel-collector-exporter'
+    static_configs:
+      - targets: ['otel-collector:8889']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'promtail'
+    static_configs:
+      - targets: ['promtail:9080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+    metrics_path: '/metrics'
+    scrape_interval: 30s

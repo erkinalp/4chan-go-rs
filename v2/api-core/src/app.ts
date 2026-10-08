@@ -13,6 +13,8 @@ import { FilesModule } from "./modules/files/files.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
 import { CaptchaModule } from "./modules/captcha/captcha.module";
 import { HealthModule } from "./modules/health/health.module";
+import { MetricsModule } from "./modules/metrics/metrics.module";
+import { MetricsInterceptor } from "./modules/metrics/metrics.interceptor";
 import { UserRateLimiterInterceptor } from "./middleware/user-rate-limiter";
 
 @Module({
@@ -53,6 +55,7 @@ import { UserRateLimiterInterceptor } from "./middleware/user-rate-limiter";
     // Servicios core
     PrismaModule,
     HealthModule,
+    MetricsModule,
 
     // M�dulos funcionales
     AuthModule,
@@ -67,6 +70,10 @@ import { UserRateLimiterInterceptor } from "./middleware/user-rate-limiter";
     {
       provide: APP_INTERCEPTOR,
       useClass: UserRateLimiterInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
     },
   ],
 })

@@ -11,6 +11,6 @@ spec:
   ports:
   - name: http
     port: 8082
-    targetPort: 8082
+    targetPort: 8080
     protocol: TCP
   type: ClusterIP
