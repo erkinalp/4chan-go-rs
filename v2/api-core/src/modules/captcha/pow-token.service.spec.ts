@@ -6,6 +6,7 @@ import { PowTokenService, hasLeadingZeroBits } from "./pow-token.service";
 
 const redisStore = new Map<string, string>();
 const mockRedis = {
+  on: jest.fn(),
   setex: jest.fn((key: string, _ttl: number, value: string) => {
     redisStore.set(key, value);
     return Promise.resolve("OK");

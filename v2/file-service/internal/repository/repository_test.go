@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS files (
     sha256_hash VARCHAR(64) NOT NULL,
     is_spoilered BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    post_id UUID
+    post_id UUID,
+    uploader_id VARCHAR(255)
 );
 CREATE TABLE IF NOT EXISTS banned_files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -83,7 +84,7 @@ func testDB(t *testing.T) *database.PostgresDB {
 		t.Fatalf("failed to create test schema: %v", err)
 	}
 	if _, err := db.GetPool().Exec(context.Background(),
-		"TRUNCATE files, banned_files, file_processing_queue"); err != nil {
+		"TRUNCATE files, banned_files, file_processing_queue CASCADE"); err != nil {
 		t.Fatalf("failed to truncate test tables: %v", err)
 	}
 	t.Cleanup(db.Close)

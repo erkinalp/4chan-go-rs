@@ -33,6 +33,10 @@ type ServerConfig struct {
 	IdleTimeoutSeconds  int    `mapstructure:"IDLE_TIMEOUT_SECONDS"`
 	APIPrefix           string `mapstructure:"API_PREFIX"`
 	APIVersion          string `mapstructure:"API_VERSION"`
+	// Comma-separated CIDRs/IPs whose X-Forwarded-For values are trusted.
+	// Empty keeps gin's default (all proxies trusted) for backwards compat;
+	// set to the edge gateway address in production.
+	TrustedProxies string `mapstructure:"TRUSTED_PROXIES"`
 }
 
 // DatabaseConfig holds database related configuration
@@ -175,6 +179,7 @@ func Load() (*Config, error) {
 		"CAPTCHA_SITE_KEY",
 		"CAPTCHA_VERIFY_URL",
 		"CORS_ALLOW_ORIGINS",
+		"TRUSTED_PROXIES",
 	} {
 		if err := viper.BindEnv(key); err != nil {
 			return nil, fmt.Errorf("failed to bind env var %s: %w", key, err)

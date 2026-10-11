@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../services/prisma/prisma.service";
 
 const mockRedis = {
+  on: jest.fn(),
   ping: jest.fn(),
 };
 

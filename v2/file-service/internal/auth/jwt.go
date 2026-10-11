@@ -34,6 +34,9 @@ type Claims struct {
 	Exp         int64    `json:"exp"`
 	Iat         int64    `json:"iat"`
 	Permissions []string `json:"permissions,omitempty"`
+	// CreatedAt mirrors api-core's `created_at` claim (unix seconds); the rate
+	// limiter aligns fixed windows to it.
+	CreatedAt int64 `json:"created_at,omitempty"`
 }
 
 // JWTAuthMiddleware creates a Gin middleware that validates JWT tokens
@@ -157,6 +160,9 @@ type GNAPClient struct {
 	ClientKey    string
 	ClientSecret string
 	HTTPClient   *http.Client
+	// LocalSecret enables offline HS256 validation of API-issued JWTs before
+	// falling back to remote introspection.
+	LocalSecret string
 }
 
 type GNAPAccessToken struct {
@@ -295,9 +301,41 @@ func (c *GNAPClient) RequestGrant(ctx context.Context, req *GNAPGrantRequest) (*
 	return &grantResp, nil
 }
 
+// ValidateLocalToken verifies a locally-issued HS256 JWT (the format api-core
+// mints) and converts it to a UserContext. This lets Bearer tokens work even
+// when no GNAP introspection service is reachable.
+func ValidateLocalToken(tokenStr, secret string) (*UserContext, error) {
+	claims, err := validateToken(tokenStr, secret)
+	if err != nil {
+		return nil, err
+	}
+	if claims.Exp > 0 && time.Now().Unix() > claims.Exp {
+		return nil, fmt.Errorf("token has expired")
+	}
+	createdAt := time.Now()
+	if claims.CreatedAt > 0 {
+		createdAt = time.Unix(claims.CreatedAt, 0)
+	}
+	return &UserContext{
+		Sub:         claims.Sub,
+		Email:       claims.Email,
+		Role:        claims.Role,
+		Permissions: claims.Permissions,
+		CreatedAt:   createdAt,
+	}, nil
+}
+
+// ValidateToken first attempts local HS256 validation when a shared secret is
+// configured, then falls back to GNAP introspection.
 func (c *GNAPClient) ValidateToken(ctx context.Context, token string) (*UserContext, error) {
 	if token == "" {
 		return nil, fmt.Errorf("empty token")
+	}
+
+	if c.LocalSecret != "" {
+		if userCtx, err := ValidateLocalToken(token, c.LocalSecret); err == nil {
+			return userCtx, nil
+		}
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.ServerURL+"/gnap/introspect", nil)

@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/internal/api/handlers"
@@ -27,25 +28,28 @@ func NewRouter(
 ) *gin.Engine {
 	router := gin.New()
 
-	// Initialize GNAP client for authentication using proper GNAP config
-	// Falls back to JWT config if GNAP config is not set (for backwards compatibility)
-	gnapServerURL := cfg.GNAP.ServerURL
-	gnapClientKey := cfg.GNAP.ClientKey
-	gnapClientSecret := cfg.GNAP.ClientSecret
-	if gnapServerURL == "" {
-		gnapServerURL = cfg.JWT.Issuer
+	// Restrict which proxies may supply X-Forwarded-For values. Without this
+	// gin trusts every proxy, letting any direct client spoof its apparent IP.
+	if cfg.Server.TrustedProxies != "" {
+		proxies := strings.Split(cfg.Server.TrustedProxies, ",")
+		for i, p := range proxies {
+			proxies[i] = strings.TrimSpace(p)
+		}
+		if err := router.SetTrustedProxies(proxies); err != nil {
+			logger.Warn().Err(err).Msg("Invalid TRUSTED_PROXIES value; keeping gin defaults")
+		}
 	}
-	if gnapClientKey == "" {
-		gnapClientKey = cfg.JWT.SecretKey
-	}
-	if gnapClientSecret == "" {
-		gnapClientSecret = cfg.JWT.RefreshSecret
-	}
+
+	// Initialize GNAP client for authentication. Bearer tokens are first
+	// validated locally as HS256 JWTs (what api-core issues); only when that
+	// fails does the client fall back to GNAP introspection, so uploads and
+	// deletes keep working without a GNAP server deployed.
 	gnapClient := auth.NewGNAPClient(
-		gnapServerURL,
-		gnapClientKey,
-		gnapClientSecret,
+		cfg.GNAP.ServerURL,
+		cfg.GNAP.ClientKey,
+		cfg.GNAP.ClientSecret,
 	)
+	gnapClient.LocalSecret = cfg.JWT.SecretKey
 
 	// Initialize media processor client for thumbnail generation
 	var mediaProcessor *services.MediaProcessorClient

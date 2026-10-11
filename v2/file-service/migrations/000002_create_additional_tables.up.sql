@@ -1,6 +1,6 @@
 
 CREATE TABLE file_processing_queue (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
     processing_type VARCHAR(50) NOT NULL,
     priority INTEGER DEFAULT 0,
@@ -14,9 +14,9 @@ CREATE TABLE file_processing_queue (
 );
 
 CREATE TABLE file_access_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    user_id UUID,
     access_type VARCHAR(20) NOT NULL CHECK (access_type IN ('view', 'download', 'thumbnail')),
     ip_address INET,
     user_agent TEXT,

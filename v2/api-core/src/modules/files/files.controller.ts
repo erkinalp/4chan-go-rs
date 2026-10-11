@@ -8,6 +8,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  Headers,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -35,8 +36,9 @@ export class FilesController {
     @UploadedFile()
     file: { buffer: Buffer; originalname: string; mimetype: string },
     @Body("postId") postId: string,
+    @Headers("authorization") authorization?: string,
   ) {
-    return this.filesService.uploadFile(file, postId);
+    return this.filesService.uploadFile(file, postId, authorization);
   }
 
   @Post("metadata")
@@ -65,7 +67,10 @@ export class FilesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.MODERATOR, Role.ADMIN)
   @ApiOperation({ summary: "Delete a file record (mod/admin)" })
-  remove(@Param("id") id: string) {
-    return this.filesService.remove(id);
+  remove(
+    @Param("id") id: string,
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.filesService.remove(id, authorization);
   }
 }

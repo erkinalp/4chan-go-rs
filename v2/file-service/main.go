@@ -52,6 +52,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Apply schema migrations (files, banned_files, file_processing_queue, ...)
+	if err := db.RunMigrations(); err != nil {
+		logger.Fatal().Err(err).Msg("Failed to run database migrations")
+	}
+
 	// Initialize Redis connection
 	redis, err := database.NewRedisClient(cfg.Redis)
 	if err != nil {

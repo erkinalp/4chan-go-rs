@@ -1,10 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../services/prisma/prisma.service";
 import Redis from "ioredis";
 
 @Injectable()
 export class HealthService {
+  private readonly logger = new Logger(HealthService.name);
   private redis: Redis;
 
   constructor(
@@ -17,6 +18,10 @@ export class HealthService {
       password: this.config.get("REDIS_PASSWORD"),
       db: this.config.get("REDIS_DB", 0),
       lazyConnect: true,
+    });
+    // Prevent ioredis 'error' events from crashing the process unhandled.
+    this.redis.on("error", (err: Error) => {
+      this.logger.error(`Redis connection error: ${err.message}`);
     });
   }
 

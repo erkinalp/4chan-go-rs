@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/erkinalp/4chan-go-rs/v2/file-service/config"
@@ -251,22 +252,29 @@ func (rl *RateLimiter) incrementCounter(ctx context.Context, identifier string, 
 		return 0, err
 	}
 
+	// Set the TTL only on the first hit of the window. A bare SET would race
+	// with concurrent INCRs and silently lose counts; EXPIRE leaves the
+	// counter value untouched.
 	if count == 1 {
 		windowDuration := time.Duration(rl.cfg.WindowSeconds) * time.Second
-		rl.redis.Set(ctx, countKey, "1", windowDuration)
+		if err := rl.redis.Expire(ctx, countKey, windowDuration); err != nil {
+			return 0, err
+		}
 	}
 
 	return int(count), nil
 }
 
 func (rl *RateLimiter) getClientIP(c *gin.Context) string {
+	// The configured header is set by the edge gateway (which overwrites any
+	// client-supplied value), so it is safe to trust when present.
 	if ip := c.GetHeader(rl.ipHeaderName); ip != "" {
-		return ip
+		return strings.TrimSpace(strings.Split(ip, ",")[0])
 	}
 
-	if ip := c.GetHeader("X-Forwarded-For"); ip != "" {
-		return ip
-	}
-
+	// c.ClientIP() resolves X-Forwarded-For according to the engine's
+	// trusted-proxy configuration instead of blindly trusting the raw header
+	// (an arbitrary client-supplied XFF would otherwise allow per-IP
+	// rate-limit bypass).
 	return c.ClientIP()
 }

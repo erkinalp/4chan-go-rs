@@ -56,7 +56,7 @@ groups:
           description: "MinIO storage usage is above 90%."
 
       - alert: GatewayHighErrorRate
-        expr: rate(nginx_http_requests_total{status=~"5.."}[5m]) > 0.1
+        expr: rate(http_requests_total{job="nginx-gateway",status=~"5.."}[5m]) > 0.1
         for: 2m
         labels:
           severity: critical
@@ -65,7 +65,7 @@ groups:
           description: "Gateway error rate is {{ $value }} errors per second."
 
       - alert: GatewayRateLimitTriggered
-        expr: rate(nginx_http_requests_total{status="429"}[5m]) > 10
+        expr: rate(rate_limit_hits_total{job="nginx-gateway"}[5m]) > 10
         for: 1m
         labels:
           severity: warning
@@ -74,7 +74,7 @@ groups:
           description: "Rate limiting triggered {{ $value }} times per second."
 
       - alert: GatewayAuthFailures
-        expr: rate(nginx_http_requests_total{status="401"}[5m]) > 5
+        expr: rate(auth_requests_total{job="nginx-gateway",status=~"denied|rejected|failed|401"}[5m]) > 5
         for: 2m
         labels:
           severity: warning
@@ -83,7 +83,7 @@ groups:
           description: "Authentication failures at {{ $value }} per second."
 
       - alert: GatewayHighLatency
-        expr: histogram_quantile(0.95, rate(nginx_http_request_duration_seconds_bucket[5m])) > 2
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="nginx-gateway"}[5m])) > 2
         for: 3m
         labels:
           severity: warning
