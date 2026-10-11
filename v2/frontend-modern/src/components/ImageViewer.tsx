@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 
 interface ImageViewerProps {
   src: string;
@@ -7,6 +7,8 @@ interface ImageViewerProps {
 }
 
 const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) => {
+  const [zoomed, setZoomed] = useState(false);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -26,32 +28,49 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) => {
   return (
     <div
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt}
       style={{
         position: 'fixed',
         inset: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         zIndex: 9999,
         cursor: 'pointer',
+        display: zoomed ? 'block' : 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: zoomed ? 'auto' : 'hidden',
       }}
     >
       <img
         src={src}
         alt={alt}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          maxWidth: '90vw',
-          maxHeight: '90vh',
-          objectFit: 'contain',
-          cursor: 'default',
+        onClick={(e) => {
+          e.stopPropagation();
+          setZoomed((z) => !z);
         }}
+        style={
+          zoomed
+            ? {
+                display: 'block',
+                maxWidth: 'none',
+                maxHeight: 'none',
+                margin: '16px auto',
+                cursor: 'zoom-out',
+              }
+            : {
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+                cursor: 'zoom-in',
+              }
+        }
       />
       <button
         onClick={onClose}
         style={{
-          position: 'absolute',
+          position: 'fixed',
           top: '16px',
           right: '16px',
           background: 'rgba(0,0,0,0.6)',
@@ -67,6 +86,24 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, alt, onClose }) => {
       >
         &times;
       </button>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'fixed',
+          bottom: '12px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: '#ddd',
+          fontSize: '0.75rem',
+          background: 'rgba(0,0,0,0.6)',
+          padding: '4px 10px',
+          borderRadius: '3px',
+          cursor: 'default',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Click image to {zoomed ? 'fit' : 'zoom'} &middot; Esc to close
+      </div>
     </div>
   );
 };

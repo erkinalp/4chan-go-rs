@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useBoard } from '@/api/boards';
 import { useThreads } from '@/api/threads';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import LoadingFallback from '@/components/LoadingFallback';
 import type { Thread } from '@/types/api';
 
@@ -105,6 +106,14 @@ const CatalogPage: React.FC = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <Breadcrumbs
+        items={[
+          { label: 'Home', to: '/' },
+          { label: 'Boards', to: '/boards' },
+          { label: `/${boardId}/`, to: `/board/${boardId}` },
+          { label: 'Catalog' },
+        ]}
+      />
       <div style={{ textAlign: 'center', marginBottom: '12px' }}>
         <h1 style={{ fontSize: '1.2rem', color: 'var(--accent)' }}>
           /{boardId}/ - {board?.title ?? boardId} - Catalog

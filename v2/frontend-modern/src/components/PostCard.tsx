@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Post } from '@/types/api';
 import ImageViewer from './ImageViewer';
+import ReportForm from './ReportForm';
 
 interface PostCardProps {
   post: Post;
@@ -40,6 +41,7 @@ function renderMessage(message: string): React.ReactNode {
 
 const PostCard: React.FC<PostCardProps> = ({ post, isOp = false }) => {
   const [showViewer, setShowViewer] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const date = new Date(post.createdAt);
   const dateStr = date.toLocaleString('en-US', {
     month: '2-digit',
@@ -81,6 +83,14 @@ const PostCard: React.FC<PostCardProps> = ({ post, isOp = false }) => {
         <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>
           No.{post.postNumber}
         </span>
+        <button
+          type="button"
+          onClick={() => setShowReport(true)}
+          className="report-link"
+          aria-label={`Report post ${post.postNumber}`}
+        >
+          [Report]
+        </button>
       </div>
 
       {post.file && (
@@ -114,6 +124,16 @@ const PostCard: React.FC<PostCardProps> = ({ post, isOp = false }) => {
           src={post.file.fileUrl}
           alt={post.file.originalFilename}
           onClose={() => setShowViewer(false)}
+        />
+      )}
+
+      {showReport && (
+        <ReportForm
+          postId={post.id}
+          threadId={post.threadId}
+          boardId={post.boardId}
+          postNumber={post.postNumber}
+          onClose={() => setShowReport(false)}
         />
       )}
     </div>

@@ -113,6 +113,7 @@ const AdminPage: React.FC = () => {
                     + Create Board
                   </button>
                 </div>
+                <div className="table-wrap">
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
@@ -160,6 +161,7 @@ const AdminPage: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </>
             )}
           </>
@@ -170,6 +172,7 @@ const AdminPage: React.FC = () => {
             {usersLoading ? (
               <LoadingFallback />
             ) : (
+              <div className="table-wrap">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -192,6 +195,7 @@ const AdminPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </>
         )}
@@ -227,6 +231,7 @@ const AdminPage: React.FC = () => {
                 <div style={{ marginBottom: '16px', fontSize: '0.85rem' }}>
                   <strong>Uptime:</strong> {Math.round(health.uptime / 3600)}h
                 </div>
+                <div className="table-wrap">
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
@@ -245,6 +250,7 @@ const AdminPage: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             ) : (
               <p style={{ color: 'var(--text-muted)' }}>Could not load health data.</p>

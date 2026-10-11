@@ -63,6 +63,7 @@ const BoardsPage: React.FC = () => {
         </label>
       </div>
 
+      <div className="table-wrap">
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
         <thead>
           <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
@@ -112,6 +113,7 @@ const BoardsPage: React.FC = () => {
           ))}
         </tbody>
       </table>
+      </div>
 
       {filtered.length === 0 && (
         <p style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>

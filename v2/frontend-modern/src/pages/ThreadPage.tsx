@@ -5,6 +5,7 @@ import { useThread } from '@/api/threads';
 import { usePosts, useCreatePost } from '@/api/posts';
 import PostCard from '@/components/PostCard';
 import ReplyForm from '@/components/ReplyForm';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import LoadingFallback from '@/components/LoadingFallback';
 
 const ThreadPage: React.FC = () => {
@@ -21,6 +22,14 @@ const ThreadPage: React.FC = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <Breadcrumbs
+        items={[
+          { label: 'Home', to: '/' },
+          { label: 'Boards', to: '/boards' },
+          { label: `/${boardId}/`, to: `/board/${boardId}` },
+          { label: thread?.subject || `Thread ${threadId}` },
+        ]}
+      />
       <div style={{ marginBottom: '12px', fontSize: '0.8rem' }}>
         <Link to={`/board/${boardId}`}>[Return]</Link>
         {' | '}
@@ -55,7 +64,7 @@ const ThreadPage: React.FC = () => {
       )}
 
       {posts?.map((post) => (
-        <div key={post.id} style={{ marginLeft: '20px', marginBottom: '4px' }}>
+        <div key={post.id} className="reply-indent">
           <PostCard post={post} />
         </div>
       ))}

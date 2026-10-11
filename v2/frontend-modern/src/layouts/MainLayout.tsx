@@ -3,6 +3,7 @@ import { Link, Outlet } from 'react-router-dom';
 import { useAppSelector } from '@/hooks/redux';
 import { selectIsAuthenticated, selectUser } from '@/features/auth/authSlice';
 import ThemeSelector from '@/components/ThemeSelector';
+import BoardNav from '@/components/BoardNav';
 
 const MainLayout: React.FC = () => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -11,6 +12,7 @@ const MainLayout: React.FC = () => {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header
+        className="site-header"
         style={{
           background: 'var(--header-bg)',
           color: 'var(--header-text)',
@@ -62,7 +64,9 @@ const MainLayout: React.FC = () => {
         </div>
       </header>
 
-      <main style={{ flex: 1, padding: '16px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+      <BoardNav />
+
+      <main className="main-content">
         <Outlet />
       </main>
 

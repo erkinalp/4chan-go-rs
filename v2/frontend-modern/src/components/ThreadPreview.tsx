@@ -18,6 +18,10 @@ const ThreadPreview: React.FC<ThreadPreviewProps> = ({ thread }) => {
     <div style={{ marginBottom: '24px' }}>
       <PostCard post={thread.op} isOp />
 
+      <div style={{ fontSize: '0.8rem', margin: '2px 0 4px 4px' }}>
+        <Link to={`/board/${thread.boardId}/thread/${thread.id}`}>[Reply]</Link>
+      </div>
+
       {omittedPosts > 0 && (
         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 4px 20px' }}>
           <Link to={`/board/${thread.boardId}/thread/${thread.id}`}>
@@ -30,7 +34,7 @@ const ThreadPreview: React.FC<ThreadPreviewProps> = ({ thread }) => {
       )}
 
       {thread.lastReplies?.map((reply) => (
-        <div key={reply.id} style={{ marginLeft: '20px' }}>
+        <div key={reply.id} className="reply-indent">
           <PostCard post={reply} />
         </div>
       ))}
